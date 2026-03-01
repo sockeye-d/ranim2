@@ -51,7 +51,10 @@ suspend fun ElementAnimation.yield(frames: Frames) {
 fun animation(block: suspend ElementAnimation.() -> Unit) = ElementAnimation().apply {
     continuation = block.createCoroutine(
         receiver = this,
-        completion = Continuation(EmptyCoroutineContext) {
+        completion = Continuation(EmptyCoroutineContext) { result ->
+            if (result.isFailure) {
+                println("Animation cancelled with exception: $result")
+            }
             isFinished = true
         }
     )

@@ -36,6 +36,8 @@ class TweenAnimation<T>(
         property.setter.call(animator(from, to, factor))
         tick++
     }
+
+    override fun toString() = "TweenAnimation($property from $from to $to in $length frames)"
 }
 
 fun <T : Any> KMutableProperty<T>.tween(

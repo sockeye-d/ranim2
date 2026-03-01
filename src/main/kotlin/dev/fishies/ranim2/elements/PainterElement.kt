@@ -14,9 +14,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import dev.fishies.ranim2.core.Scene
 
 class PainterElement(val painter: Painter, position: Offset, size: Size, rotation: Float, tint: Color?) :
-    BasicElement() {
-    var position by mutableStateOf(position)
-    var size by mutableStateOf(size)
+    BasicElement(position, size) {
     var tint by mutableStateOf(tint)
     var rotation by mutableStateOf(rotation)
 

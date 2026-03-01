@@ -14,8 +14,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.SkiaGraphicsContext
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -35,6 +38,7 @@ import dev.fishies.ranim2.core.animation
 import dev.fishies.ranim2.core.tween
 import dev.fishies.ranim2.core.yield
 import dev.fishies.ranim2.elements.makePainter
+import dev.fishies.ranim2.elements.makeRectangle
 import dev.fishies.ranim2.elements.makeText
 import dev.fishies.ranim2.ranim2.generated.resources.Res
 import dev.fishies.ranim2.ranim2.generated.resources.skull_list
@@ -46,7 +50,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.decodeToImageBitmap
+import org.jetbrains.compose.resources.decodeToSvgPainter
 import java.io.File
+import java.io.InputStream
 import javax.imageio.ImageIO
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -66,16 +73,16 @@ import kotlin.time.Duration.Companion.milliseconds
 
 val anim = animation {
     //val shape = makeRectangle(
-    //    size = Size(10f, 10f),
+    //    size = Size(50f, 50f),
     //    color = Color.Black,
     //    position = Offset(20f, 100f),
     //    radius = 8.0f,
     //    style = Stroke(width = 2.0f)
     //)
 
-    val resource = Res.drawable.skull_list
+    //val resource = Res.drawable.skull_list
     //val painter = loadSvg("drawable/skull_list.svg")
-    val painter = loadImage("drawable/cat_thumbsup.webp")
+    //val painter = loadImage("drawable/cat_thumbsup.webp")
     //val shape = makePainter(
     //    painter,
     //    //tint = Color.Red,
@@ -87,17 +94,24 @@ val anim = animation {
     //)
     val shape = makeText("This is some text", FontFamily.Monospace)
     //shape.size *= 0.05f
+    //yield(
+    //    shape::position.tween(to = Offset(20f, 300f), length = 100),
+    //    shape::color.tween(to = Color.Blue, length = 100),
+        //shape::rotation.tween(to = shape.rotation + 140f, length = 100, tweener = quadratic(Out)),
+    //)
+    println("Finished")
     val length = 120
     while (true) {
         yield(
             shape::position.tween(to = Offset(20f, 40f), length = length, tweener = quadratic(Out)),
             //shape::size.tween(to = Size(10f, 10f), length = length, tweener = quartic(Out)),
-            shape::rotation.tween(to = shape.rotation + 140f, length = length, tweener = quadratic(Out)),
+            //shape::rotation.tween(to = shape.rotation + 140f, length = length, tweener = quadratic(Out)),
         )
+        shape.text += " hi"
         yield(
             shape::position.tween(to = Offset(20f, 100f), length = length, tweener = quadratic(In)),
             //shape::size.tween(to = Size(8f, 14f), length = length, tweener = quartic(In)),
-            shape::rotation.tween(to = shape.rotation + 40f, length = length, tweener = quartic(In)),
+            //shape::rotation.tween(to = shape.rotation + 40f, length = length, tweener = quartic(In)),
         )
     }
     //yield(circle1::rotation.tween(to = 360.0f, length = 50))
@@ -113,11 +127,10 @@ val anim = animation {
 }
 
 private fun loadSvg(path: String): Painter =
-    loadSvgPainter(runBlocking { Res.readBytes(path) }.inputStream(), Density(1.0f))
+    runBlocking { Res.readBytes(path) }.inputStream().readAllBytes().decodeToSvgPainter(Density(1.0f))
 
 private fun loadImage(path: String, filterQuality: FilterQuality = FilterQuality.Low): Painter =
-    //loadSvgPainter(runBlocking { Res.readBytes(path) }.inputStream(), Density(1.0f))
-    BitmapPainter(loadImageBitmap(runBlocking { Res.readBytes(path) }.inputStream()), filterQuality = filterQuality)
+    BitmapPainter(runBlocking { Res.readBytes(path) }.inputStream().readAllBytes().decodeToImageBitmap(), filterQuality = filterQuality)
 
 @OptIn(InternalComposeUiApi::class)
 fun main() = application {

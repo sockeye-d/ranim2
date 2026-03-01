@@ -2,6 +2,7 @@ package dev.fishies.ranim2.elements
 
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -18,21 +19,19 @@ import androidx.compose.ui.unit.*
 import dev.fishies.ranim2.core.Scene
 
 class ShapeElement(shape: Shape, position: Offset, size: Size, rotation: Float, color: Color, style: DrawStyle) :
-    BasicElement() {
-    var position by mutableStateOf(position)
-    var size by mutableStateOf(size)
+    BasicElement(position, size) {
     var color by mutableStateOf(color)
     var rotation by mutableStateOf(rotation)
     var style by mutableStateOf(style)
     var shape by mutableStateOf(shape)
 
+    private val shapeOutline by derivedStateOf { this.shape.createOutline(this.size, LayoutDirection.Ltr, Density(1f)) }
+
     override fun DrawScope.draw() {
-        val realSize = this@ShapeElement.size * density
-        val realPosition = position * density
-        val shapeOutline = shape.createOutline(realSize, LayoutDirection.Ltr, Density(density))
+        val size = this@ShapeElement.size
         withTransform({
-            translate(realPosition.x, realPosition.y)
-            rotate(rotation, Offset(realSize.width / 2, realSize.height / 2))
+            translate(position.x, position.y)
+            rotate(rotation, Offset(size.width / 2, size.height / 2))
         }) {
             drawOutline(shapeOutline, color, style = style)
         }
