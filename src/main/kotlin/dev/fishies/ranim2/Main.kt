@@ -50,6 +50,7 @@ import dev.fishies.ranim2.tweener.quadratic
 import dev.fishies.ranim2.tweener.quartic
 import io.github.treesitter.ktreesitter.Language
 import io.github.treesitter.ktreesitter.Parser
+import io.github.treesitter.ktreesitter.Query
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -79,7 +80,9 @@ val anim = animation {
     val lang = Language(TreeSitterKotlin.language())
     val parser = Parser(lang)
     val tree = parser.parse("""fun main() { println("Hello world!!") }""")
-    println(tree)
+    val query = Query(lang, TreeSitterKotlin.highlights)
+    val highlights = query.matches(tree.rootNode)
+    println(highlights.toList())
     //val shape = makeRectangle(
     //    size = Size(50f, 50f),
     //    color = Color.Black,

@@ -1,4 +1,5 @@
 import org.gradle.kotlin.dsl.support.uppercaseFirstChar
+import kotlin.text.replace
 
 val langPackage = "dev.fishies.ranim2.languages"
 val langName = "kotlin"
@@ -13,11 +14,12 @@ plugins {
     id("io.github.tree-sitter.ktreesitter-plugin")
 }
 
+val langClassName = "TreeSitter$bigLangName"
 grammar {
     baseDir = grammarDir
     interopName = "grammar"
     grammarName = langName
-    className = "TreeSitter$bigLangName"
+    className = langClassName
     libraryName = "ktreesitter-$langName"
     packageName = "$langPackage.$langName"
     files = arrayOf(
@@ -42,20 +44,26 @@ kotlin {
             resources.srcDir(generatedSrc.dir("jvmMain").dir("resources"))
             dependencies {
                 implementation(libs.treesitter)
+                api(projects.languages.common)
             }
         }
     }
 }
 
-val makeLangInclude = tasks.register<Copy>("makeLangInclude") {
+val makeLangInclude = tasks.register("makeLangInclude") {
     dependsOn(generateGrammarFilesTask)
-    from(grammarDir.resolve("bindings/c/tree-sitter.h.in")) {
-        filter {
-            it.replace("@UPPER_PARSERNAME@", langName.uppercase()).replace("@PARSERNAME@", langName)
-        }
-    }
 
-    into(generateGrammarFilesTask.generatedSrc.get().file("jni/tree_sitter/tree-sitter-$langName.h"))
+    val inputFile = grammarDir.resolve("bindings/c/tree-sitter.h.in")
+    val outputFile = generateGrammarFilesTask.generatedSrc.get().file("jni/tree_sitter/tree-sitter-$langName.h")
+    inputs.file(inputFile)
+    outputs.file(outputFile)
+
+    doLast {
+        outputFile.asFile.parentFile.mkdirs()
+        outputFile.asFile.writeText(
+            inputFile.readText().replace("@UPPER_PARSERNAME@", langName.uppercase()).replace("@PARSERNAME@", langName)
+        )
+    }
 }
 
 val compileGrammarTask = tasks.register<Exec>("compileGrammar") {
@@ -67,27 +75,86 @@ val compileGrammarTask = tasks.register<Exec>("compileGrammar") {
 
     val libFile = outDir.file("libktreesitter-$langName.so")
     val grammarSrcDir = grammarDir.resolve("src")
-    val cBindingsDir = grammarDir.resolve("bindings/c")
+    val jniDir = generateGrammarFilesTask.generatedSrc.get().dir("jni")
 
     inputs.dir(grammarSrcDir)
-    inputs.dir(cBindingsDir)
     outputs.file(libFile)
 
     commandLine(
         "gcc", "-shared", "-fPIC", "-O2", "-std=c11",
         "-I$grammarSrcDir",
-        "-I$cBindingsDir",
-        "-I${cBindingsDir.resolve("tree_sitter")}",
+        "-I${jniDir.file("tree_sitter")}",
         "-I${System.getProperty("java.home")}/include",
         "-I${System.getProperty("java.home")}/include/linux",
         "-o", libFile,
         grammarDir.resolve("src/parser.c"),
         grammarDir.resolve("src/scanner.c"),
-        generateGrammarFilesTask.generatedSrc.get().file("jni/binding.c"),
+        jniDir.file("binding.c"),
     )
 
     logging.captureStandardOutput(LogLevel.ERROR)
 }
 
+fun StringBuilder.appendBlock(
+    indent: String = "    ",
+    open: String = "{",
+    close: String = "}",
+    block: StringBuilder.() -> Unit,
+) {
+    appendLine(open)
+    append(buildString { block() }.prependIndent(indent))
+    appendLine(close)
+}
+
+val baseInterface = "dev.fishies.ranim2.languages.common.TreeSitterLanguage"
+val knownQueries = mapOf(
+    "highlights" to "dev.fishies.ranim2.languages.common.TreeSitterLanguage.Highlightable",
+    "tags" to "dev.fishies.ranim2.languages.common.TreeSitterLanguage.Taggable",
+)
+
+val modifyGeneratedFileTask = tasks.register("modifyGeneratedFile") {
+    dependsOn(generateGrammarFilesTask)
+
+    val queriesFolder = grammarDir.resolve("queries/")
+    if (!queriesFolder.exists()) {
+        return@register
+    }
+
+    val generatedSrc = generateGrammarFilesTask.generatedSrc.get()
+    val folder = generatedSrc.dir("jvmMain/kotlin/${langPackage.replace(".", "/")}/$langName")
+    val generatedFile = folder.file("$langClassName.kt")
+    val files = queriesFolder.listFiles()
+
+    inputs.file(generatedFile)
+    outputs.file(generatedFile)
+
+    doLast {
+        val text = generatedFile.asFile.readText()
+        val implString = buildString {
+            for (query: File in files) {
+                val rawString = "\"\"\"${query.readText().escapeString()}\"\"\""
+                val queryName = query.nameWithoutExtension
+
+                if (queryName in knownQueries) {
+                    appendLine("override val $queryName = $rawString")
+                } else {
+                    appendLine("const val $queryName = $rawString")
+                }
+            }
+        }
+        val baseInterfaces = files.mapNotNull { knownQueries[it.nameWithoutExtension] } + baseInterface
+        val newText = text.replace(
+            "actual object $langClassName {",
+            "actual object $langClassName : ${baseInterfaces.joinToString()} {\n$implString\n",
+        ).replace("actual fun language()", "actual override fun language()")
+        generatedFile.asFile.writeText(newText)
+    }
+}
+
+fun String.escapeString() = replace("\${", "\${\"$\"}{").replace("\"\"\"", "$" + """{"\"\"\""}""")
+
 tasks.named("jvmProcessResources") { dependsOn(compileGrammarTask) }
-tasks.named("compileKotlinJvm") { dependsOn(generateGrammarFilesTask) }
+tasks.named("compileKotlinJvm") {
+    dependsOn(generateGrammarFilesTask)
+    dependsOn(modifyGeneratedFileTask)
+}

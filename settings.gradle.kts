@@ -35,4 +35,5 @@ plugins {
 
 rootProject.name = "ranim2"
 
+include(":languages:common")
 include(":languages:kotlin")
