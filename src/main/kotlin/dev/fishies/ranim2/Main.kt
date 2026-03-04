@@ -1,8 +1,11 @@
 package dev.fishies.ranim2
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.Button
 import androidx.compose.material.DrawerDefaults.shape
@@ -14,11 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.SkiaGraphicsContext
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -26,9 +27,13 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.platform.LocalGraphicsContext
-import androidx.compose.ui.res.loadImageBitmap
-import androidx.compose.ui.res.loadSvgPainter
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.GenericFontFamily
+import androidx.compose.ui.text.font.SystemFontFamily
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
@@ -37,28 +42,25 @@ import androidx.compose.ui.window.application
 import dev.fishies.ranim2.core.animation
 import dev.fishies.ranim2.core.tween
 import dev.fishies.ranim2.core.yield
-import dev.fishies.ranim2.elements.makePainter
-import dev.fishies.ranim2.elements.makeRectangle
 import dev.fishies.ranim2.elements.makeText
 import dev.fishies.ranim2.languages.kotlin.TreeSitterKotlin
 //import dev.fishies.ranim2.languages.kotlin.TreeSitterKotlin
 import dev.fishies.ranim2.ranim2.generated.resources.Res
-import dev.fishies.ranim2.ranim2.generated.resources.skull_list
-import dev.fishies.ranim2.tweener.In
+import dev.fishies.ranim2.syntax.SyntaxHighlighterTheme
 import dev.fishies.ranim2.tweener.Out
 import dev.fishies.ranim2.tweener.quadratic
-import dev.fishies.ranim2.tweener.quartic
-import io.github.treesitter.ktreesitter.Language
-import io.github.treesitter.ktreesitter.Parser
-import io.github.treesitter.ktreesitter.Query
+import dev.fishies.ranim2.syntax.highlight
+import io.github.treesitter.ktreesitter.QueryMatch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromStream
 import org.jetbrains.compose.resources.decodeToImageBitmap
 import org.jetbrains.compose.resources.decodeToSvgPainter
 import java.io.File
-import java.io.InputStream
 import javax.imageio.ImageIO
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -76,72 +78,64 @@ import kotlin.time.Duration.Companion.milliseconds
 //return svgPainter
 //}
 
-val anim = animation {
-    val lang = Language(TreeSitterKotlin.language())
-    val parser = Parser(lang)
-    val tree = parser.parse("""fun main() { println("Hello world!!") }""")
-    val query = Query(lang, TreeSitterKotlin.highlights)
-    val highlights = query.matches(tree.rootNode)
-    println(highlights.toList())
-    //val shape = makeRectangle(
-    //    size = Size(50f, 50f),
-    //    color = Color.Black,
-    //    position = Offset(20f, 100f),
-    //    radius = 8.0f,
-    //    style = Stroke(width = 2.0f)
-    //)
-
-    //val resource = Res.drawable.skull_list
-    //val painter = loadSvg("drawable/skull_list.svg")
-    //val painter = loadImage("drawable/cat_thumbsup.webp")
-    //val shape = makePainter(
-    //    painter,
-    //    //tint = Color.Red,
-    //    rotation = 40f,
-    //    //color = Color.Black,
-    //    //position = Offset(20f, 100f),
-    //    //radius = 8.0f,
-    //    //style = Stroke(width = 2.0f)
-    //)
-    val shape = makeText("This is some text", FontFamily.Monospace)
-    //shape.size *= 0.05f
-    //yield(
-    //    shape::position.tween(to = Offset(20f, 300f), length = 100),
-    //    shape::color.tween(to = Color.Blue, length = 100),
-        //shape::rotation.tween(to = shape.rotation + 140f, length = 100, tweener = quadratic(Out)),
-    //)
-    println("Finished")
-    val length = 120
-    while (true) {
-        yield(
-            shape::position.tween(to = Offset(20f, 40f), length = length, tweener = quadratic(Out)),
-            //shape::size.tween(to = Size(10f, 10f), length = length, tweener = quartic(Out)),
-            //shape::rotation.tween(to = shape.rotation + 140f, length = length, tweener = quadratic(Out)),
-        )
-        shape.text += " hi"
-        yield(
-            shape::position.tween(to = Offset(20f, 100f), length = length, tweener = quadratic(In)),
-            //shape::size.tween(to = Size(8f, 14f), length = length, tweener = quartic(In)),
-            //shape::rotation.tween(to = shape.rotation + 40f, length = length, tweener = quartic(In)),
-        )
+fun String.toComposeColor() = removePrefix("#").run {
+    when (length) {
+        6 -> Color(toLong(16) or 0xFF000000)
+        else -> error("Invalid color string $this")
     }
-    //yield(circle1::rotation.tween(to = 360.0f, length = 50))
-    //circle1.rotation = 0.0f
-    //yield(circle1::color.tween(to = Color.Red, length = 50, tweener = expoTweener(3.0, Out)))
+}
+
+val catppuccinMocha = loadJson<SyntaxHighlighterTheme>("files/catppuccin-mocha.json")
+
+fun Sequence<QueryMatch>.toAnnotations() = mapNotNull { q ->
+    q.captures.firstOrNull()?.let {
+        AnnotatedString.Range(catppuccinMocha[it.name], it.node.startByte.toInt(), it.node.endByte.toInt())
+    }
+}.sortedBy { it.start }
+
+@OptIn(ExperimentalTextApi::class)
+val anim = animation {
+    val code = $$"""
+    |fun main() {
+    |    @OptIn(ExperimentalTextApi::class)
+    |    val anim = animation {
+    |        val code = ""$${'"'}fun main() {
+    |               val x = "world!"
+    |               println("Hello ${x}")
+    |            }""$${'"'}.trimMargin()
+    |        val shape = makeText(code, FontFamily("Iosevka Nerd Font"))
+    |        shape.annotations = TreeSitterKotlin.highlight(shape.text).toAnnotations().toList()
+    |        val length = 120
+    |        yield(shape::position.tween(to = Offset(20f, 40f), length = length, tweener = quadratic(Out)))
+    |        //while (true) {
+    |            //yield(shape::position.tween(to = Offset(20f, 100f), length = length, tweener = quadratic(In)))
+    |        //}
+    |    }
+    |}""".trimMargin()
+    println(code)
+    val shape = makeText(code, FontFamily("Iosevka Nerd Font"))
+    shape.annotations = TreeSitterKotlin.highlight(shape.text).toAnnotations().toList()
+    val length = 120
+    yield(shape::position.tween(to = Offset(20f, 40f), length = length, tweener = quadratic(Out)))
     //while (true) {
-    //    yield(circle1::position.tween(to = DpOffset(100.dp, 0.dp), length = 50, tweener = expoTweener(3.0, InOut)))
-    //    yield(
-    //        circle1::position.tween(to = DpOffset(0.dp, 0.dp), length = 50, tweener = expoTweener(3.0, Out)),
-    //        circle1::rotation.tween(to = circle1.rotation + 90.0f, length = 50, tweener = expoTweener(3.0, Out))
-    //    )
+        //yield(shape::position.tween(to = Offset(20f, 100f), length = length, tweener = quadratic(In)))
     //}
 }
 
 private fun loadSvg(path: String): Painter =
-    runBlocking { Res.readBytes(path) }.inputStream().readAllBytes().decodeToSvgPainter(Density(1.0f))
+    runBlocking { Res.readBytes(path) }.decodeToSvgPainter(Density(1.0f))
 
-private fun loadImage(path: String, filterQuality: FilterQuality = FilterQuality.Low): Painter =
-    BitmapPainter(runBlocking { Res.readBytes(path) }.inputStream().readAllBytes().decodeToImageBitmap(), filterQuality = filterQuality)
+private fun loadImage(path: String, filterQuality: FilterQuality = FilterQuality.Low): Painter = BitmapPainter(
+    runBlocking { Res.readBytes(path) }.decodeToImageBitmap(),
+    filterQuality = filterQuality
+)
+
+private fun loadJsonElement(path: String) =
+    Json.parseToJsonElement(runBlocking { Res.readBytes(path) }.toString(Charsets.UTF_8))
+
+@OptIn(ExperimentalSerializationApi::class)
+private inline fun <reified T> loadJson(path: String) =
+    Json.decodeFromStream<T>(runBlocking { Res.readBytes(path) }.inputStream())
 
 @OptIn(InternalComposeUiApi::class)
 fun main() = application {
@@ -153,13 +147,15 @@ fun main() = application {
         graphicsLayer
     }
     Window(onCloseRequest = ::exitApplication, title = "My Desktop App") {
-        MaterialTheme {
+        MaterialTheme(MaterialTheme.colors.copy(background = Color(0xFF1E1E2E))) {
             LaunchedEffect(Unit) {
                 while (!anim.isFinished) {
                     anim.tick()
                     delay(3.57.milliseconds)
                 }
             }
+
+            Box(Modifier.background(MaterialTheme.colors.background).fillMaxSize())
 
             Column {
                 Canvas(modifier = Modifier.fillMaxWidth().weight(1f)) {

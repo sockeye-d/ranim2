@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.compose)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlinx.serialization)
 }
 
 group = "dev.fishies.ranim2"
@@ -16,6 +17,7 @@ dependencies {
     implementation(libs.material.icons)
     implementation(libs.kotlin.reflect)
     implementation(libs.treesitter)
+    implementation(libs.kotlinx.serialization.json)
     implementation(projects.languages.kotlin)
 }
 

@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -19,6 +20,8 @@ import androidx.compose.ui.text.font.createFontFamilyResolver
 import androidx.compose.ui.unit.*
 import dev.fishies.ranim2.core.Scene
 
+typealias TextAnnotation = AnnotatedString.Range<out AnnotatedString.Annotation>
+
 open class TextElement(
     text: String,
     fontFamily: FontFamily,
@@ -26,8 +29,8 @@ open class TextElement(
     fontSize: TextUnit,
     rotation: Float,
     tint: Color,
-) :
-    BasicElement(position) {
+    annotations: List<TextAnnotation>,
+) : BasicElement(position) {
 
     private operator fun State<Size>.setValue(
         thisObj: Any?,
@@ -36,24 +39,24 @@ open class TextElement(
     ): Unit = error("Cannot set a TextElement's size, as it is calculated intrinsically!")
 
     var text by mutableStateOf(text)
+    var annotations by mutableStateOf(annotations)
     var fontSize by mutableStateOf(fontSize)
     var color by mutableStateOf(tint)
     var rotation by mutableStateOf(rotation)
     var fontFamily by mutableStateOf(fontFamily)
     val textLayout by derivedStateOf {
         measurer.measure(
-            this.text,
+            AnnotatedString(this.text, this.annotations),
             TextStyle(fontSize = this.fontSize, fontFamily = this.fontFamily)
         )
     }
-    val textLayoutSize by derivedStateOf { textLayout.size }
 
-    override var size by derivedStateOf { textLayout.size.toSize() }
+    override var size by derivedStateOf { this.textLayout.size.toSize() }
 
     override fun DrawScope.draw() {
         withTransform({
             translate(position.x, position.y)
-            rotate(rotation, Offset(textLayoutSize.width / 2.0f, textLayoutSize.height / 2.0f))
+            rotate(rotation, Offset(textLayout.size.width / 2.0f, textLayout.size.height / 2.0f))
         }) {
             drawText(textLayout, color = color)
         }
@@ -72,5 +75,5 @@ fun Scene.makeText(
     fontSize: TextUnit = TextUnit(16f, TextUnitType.Sp),
     rotation: Float = 0f,
     color: Color = Color.Unspecified,
-) =
-    TextElement(text, fontFamily, position, fontSize, rotation, color).also { addChild(it) }
+    annotations: List<TextAnnotation> = emptyList(),
+) = TextElement(text, fontFamily, position, fontSize, rotation, color, annotations).also { addChild(it) }
