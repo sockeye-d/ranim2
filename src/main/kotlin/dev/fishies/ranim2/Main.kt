@@ -45,6 +45,7 @@ import dev.fishies.ranim2.core.yield
 import dev.fishies.ranim2.elements.makeText
 import dev.fishies.ranim2.languages.kotlin.TreeSitterKotlin
 //import dev.fishies.ranim2.languages.kotlin.TreeSitterKotlin
+//import dev.fishies.ranim2.languages.kotlin.TreeSitterKotlin
 import dev.fishies.ranim2.ranim2.generated.resources.Res
 import dev.fishies.ranim2.syntax.SyntaxHighlighterTheme
 import dev.fishies.ranim2.tweener.Out
@@ -113,7 +114,7 @@ val anim = animation {
     |    }
     |}""".trimMargin()
     println(code)
-    val shape = makeText(code, FontFamily("Iosevka Nerd Font"))
+    val shape = makeText(code, FontFamily("Iosevka Nerd Font"), color = Color.Red)
     shape.annotations = TreeSitterKotlin.highlight(shape.text).toAnnotations().toList()
     val length = 120
     yield(shape::position.tween(to = Offset(20f, 40f), length = length, tweener = quadratic(Out)))

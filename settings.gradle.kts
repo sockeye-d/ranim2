@@ -12,6 +12,12 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+
+    plugins {
+        id("io.github.tree-sitter.ktreesitter-plugin") version "0.24.1"
+        id("com.android.library") version "8.13.2"
+        id("org.jetbrains.kotlin.jvm") version "2.3.0"
+    }
 }
 
 dependencyResolutionManagement {
@@ -29,11 +35,10 @@ dependencyResolutionManagement {
 
 plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
-    id("io.github.tree-sitter.ktreesitter-plugin") version "0.24.1" apply false
-    id("com.android.library") version "8.13.2" apply false
 }
 
 rootProject.name = "ranim2"
 
+includeBuild("build-logic")
 include(":languages:common")
 include(":languages:kotlin")
