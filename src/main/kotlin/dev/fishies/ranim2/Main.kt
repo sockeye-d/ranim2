@@ -2,13 +2,8 @@ package dev.fishies.ranim2
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.Button
-import androidx.compose.material.DrawerDefaults.shape
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.LaunchedEffect
@@ -17,23 +12,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.SkiaGraphicsContext
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.ExperimentalTextApi
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.font.GenericFontFamily
-import androidx.compose.ui.text.font.SystemFontFamily
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
@@ -43,15 +30,12 @@ import dev.fishies.ranim2.core.animation
 import dev.fishies.ranim2.core.tween
 import dev.fishies.ranim2.core.yield
 import dev.fishies.ranim2.elements.makeText
-import dev.fishies.ranim2.languages.kotlin.TreeSitterKotlin
 import dev.fishies.ranim2.languages.odin.TreeSitterOdin
-//import dev.fishies.ranim2.languages.kotlin.TreeSitterKotlin
-//import dev.fishies.ranim2.languages.kotlin.TreeSitterKotlin
 import dev.fishies.ranim2.ranim2.generated.resources.Res
 import dev.fishies.ranim2.syntax.SyntaxHighlighterTheme
+import dev.fishies.ranim2.syntax.highlight
 import dev.fishies.ranim2.tweener.Out
 import dev.fishies.ranim2.tweener.quadratic
-import dev.fishies.ranim2.syntax.highlight
 import io.github.treesitter.ktreesitter.QueryMatch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -89,44 +73,24 @@ fun String.toComposeColor() = removePrefix("#").run {
 
 val catppuccinMocha = loadJson<SyntaxHighlighterTheme>("files/catppuccin-mocha.json")
 
-fun Sequence<QueryMatch>.toAnnotations() = mapNotNull { q ->
+fun Sequence<QueryMatch>.toAnnotations(byteToIndex: UInt.() -> Int) = mapNotNull { q ->
     q.captures.firstOrNull()?.let {
-        AnnotatedString.Range(catppuccinMocha[it.name], it.node.startByte.toInt(), it.node.endByte.toInt())
+        AnnotatedString.Range(catppuccinMocha[it.name], it.node.startByte.byteToIndex(), it.node.endByte.byteToIndex())
     }
 }.sortedBy { it.start }
 
 @OptIn(ExperimentalTextApi::class)
 val anim = animation {
     val code = """
-some_string := "Hello"
+some_string := "Hello, 世界"
 for character in some_string {
 	fmt.println(character)
-}
-
-some_array := [3]int{1, 4, 9}
-for value in some_array {
-	fmt.println(value)
-}
-
-some_slice := []int{1, 4, 9}
-for value in some_slice {
-	fmt.println(value)
-}
-
-some_dynamic_array := [dynamic]int{1, 4, 9} // must be enabled with `#+feature dynamic-literals`
-defer delete(some_dynamic_array)
-for value in some_dynamic_array {
-	fmt.println(value)
-}
-
-some_map := map[string]int{"A" = 1, "C" = 9, "B" = 4} // must be enabled with `#+feature dynamic-literals`
-defer delete(some_map)
-for key in some_map {
-	fmt.println(key)
 }""".trimMargin()
     println(code)
     val shape = makeText(code, FontFamily("Iosevka Nerd Font"), color = catppuccinMocha["text"].color)
-    shape.annotations = TreeSitterOdin.highlight(shape.text).toAnnotations().toList()
+    val textBytes = shape.text.toByteArray(Charsets.UTF_8)
+    shape.annotations = TreeSitterOdin.highlight(shape.text)
+        .toAnnotations { textBytes.sliceArray(0..<this.toInt()).toString(Charsets.UTF_8).length }.toList()
     val length = 120
     yield(shape::position.tween(to = Offset(20f, 40f), length = length, tweener = quadratic(Out)))
 }
