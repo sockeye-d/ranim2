@@ -17,14 +17,14 @@ import kotlin.reflect.KMutableProperty
 
 typealias Frames = Int
 
-class TweenAnimation<T>(
+class TweenAnimated<T>(
     private val property: KMutableProperty<T>,
     private val from: T,
     private val to: T,
     private val length: Frames,
     private val animator: (from: T, to: T, factor: Double) -> T,
     private val tweener: (Double) -> Double,
-) : Animation {
+) : Animated {
     private var tick: Int = 0
 
     override val isFinished: Boolean
@@ -46,7 +46,7 @@ fun <T : Any> KMutableProperty<T>.tween(
     length: Frames,
     animator: (from: T, to: T, factor: Double) -> T,
     tweener: (Double) -> Double = { it },
-) = TweenAnimation(
+) = TweenAnimated(
     property = this,
     from = from ?: this.getter.call(),
     to = to,
@@ -60,7 +60,7 @@ fun KMutableProperty<Float>.tween(
     to: Float,
     length: Frames,
     tweener: (Double) -> Double = { it },
-) = TweenAnimation(
+) = TweenAnimated(
     property = this,
     from = from ?: this.getter.call(),
     to = to,
@@ -74,7 +74,7 @@ fun KMutableProperty<Double>.tween(
     to: Double,
     length: Frames,
     tweener: (Double) -> Double = { it },
-) = TweenAnimation(
+) = TweenAnimated(
     property = this,
     from = from ?: this.getter.call(),
     to = to,
@@ -88,7 +88,7 @@ fun KMutableProperty<Dp>.tween(
     to: Dp,
     length: Frames,
     tweener: (Double) -> Double = { it },
-) = TweenAnimation(
+) = TweenAnimated(
     property = this,
     from = if (from.isSpecified) from else this.getter.call(),
     to = to,
@@ -102,7 +102,7 @@ fun KMutableProperty<DpOffset>.tween(
     to: DpOffset,
     length: Frames,
     tweener: (Double) -> Double = { it },
-) = TweenAnimation(
+) = TweenAnimated(
     property = this,
     from = if (from.isSpecified) from else this.getter.call(),
     to = to,
@@ -116,7 +116,7 @@ fun KMutableProperty<Offset>.tween(
     to: Offset,
     length: Frames,
     tweener: (Double) -> Double = { it },
-) = TweenAnimation(
+) = TweenAnimated(
     property = this,
     from = if (from.isSpecified) from else this.getter.call(),
     to = to,
@@ -130,7 +130,7 @@ fun KMutableProperty<Color>.tween(
     to: Color,
     length: Frames,
     tweener: (Double) -> Double = { it },
-) = TweenAnimation(
+) = TweenAnimated(
     property = this,
     from = if (from.isSpecified) from else this.getter.call(),
     to = to,
@@ -144,7 +144,7 @@ fun KMutableProperty<Size>.tween(
     to: Size,
     length: Frames,
     tweener: (Double) -> Double = { it },
-) = TweenAnimation(
+) = TweenAnimated(
     property = this,
     from = if (from.isSpecified) from else this.getter.call(),
     to = to,
@@ -158,7 +158,7 @@ fun KMutableProperty<Matrix>.tween(
     to: Matrix,
     length: Frames,
     tweener: (Double) -> Double = { it },
-) = TweenAnimation(
+) = TweenAnimated(
     property = this,
     from = from ?: this.getter.call(),
     to = to,

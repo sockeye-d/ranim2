@@ -42,3 +42,4 @@ rootProject.name = "ranim2"
 includeBuild("build-logic")
 include(":languages:common")
 include(":languages:kotlin")
+include(":languages:odin")

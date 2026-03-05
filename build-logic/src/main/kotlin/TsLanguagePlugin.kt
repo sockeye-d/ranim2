@@ -47,6 +47,12 @@ private fun Project.generateTreeSitterParser(nameSupplier: () -> String, moduleS
             .removePrefix("VERSION := ")
 
         val langClassName = "TreeSitter$bigLangName"
+        val parserSourceFiles = buildList {
+            add(grammarDir.resolve("src/parser.c"))
+            grammarDir.resolve("src/scanner.c").let {
+                if (it.exists()) add(it)
+            }
+        }.toTypedArray()
 
         extensions.configure<GrammarExtension>() {
             baseDir = grammarDir
@@ -55,10 +61,7 @@ private fun Project.generateTreeSitterParser(nameSupplier: () -> String, moduleS
             className = langClassName
             libraryName = "ktreesitter-$name"
             packageName = "$module.$name"
-            files = arrayOf(
-                grammarDir.resolve("src/scanner.c"),
-                grammarDir.resolve("src/parser.c"),
-            )
+            files = parserSourceFiles
         }
 
         val generateGrammarFilesTask by tasks.named<GrammarFilesTask>("generateGrammarFiles")
@@ -88,7 +91,9 @@ private fun Project.generateTreeSitterParser(nameSupplier: () -> String, moduleS
         val makeLangInclude = tasks.register("makeLangInclude") {
             dependsOn(generateGrammarFilesTask)
 
-            val inputFile = grammarDir.resolve("bindings/c/tree-sitter.h.in")
+            val inputFile = grammarDir.run {
+                resolveOrNull("bindings/c/tree-sitter.h.in") ?: resolveOrNull("bindings/c/tree-sitter-$name.h") ?: error("No C bindings in $grammarDir found!")
+            }
             val outputFile = generatedSrc.file("jni/tree_sitter/tree-sitter-$name.h")
             inputs.file(inputFile)
             outputs.file(outputFile)
@@ -124,8 +129,7 @@ private fun Project.generateTreeSitterParser(nameSupplier: () -> String, moduleS
                 "-I${System.getProperty("java.home")}/include/${System.getProperty("os.name").toLowerCase()}",
                 "-I${System.getProperty("java.home")}/include",
                 "-o", libFile,
-                grammarDir.resolve("src/parser.c"),
-                grammarDir.resolve("src/scanner.c"),
+                *parserSourceFiles,
                 jniDir.file("binding.c"),
             )
         }
@@ -185,8 +189,7 @@ private fun Project.generateTreeSitterParser(nameSupplier: () -> String, moduleS
 
 private fun String.escapeString() = replace("\${", "\${\"$\"}{").replace("\"\"\"", "$" + """{"\"\"\""}""")
 
-@Suppress("ConvertToStringTemplate")
-internal fun getLibPathFor(os: OperatingSystem, archName: String, libName: String): String {
+private fun getLibPathFor(os: OperatingSystem, archName: String, libName: String): String {
     val osName = when {
         os.isLinux -> "linux"
         os.isMacOsX -> "macos"
@@ -197,7 +200,9 @@ internal fun getLibPathFor(os: OperatingSystem, archName: String, libName: Strin
     val arch = when {
         "amd64" in archName || "x86_64" in archName -> "x64"
         "aarch64" in archName || "arm64" in archName -> "aarch64"
-        else -> error("Unsupported architecture: " + archName)
+        else -> error("Unsupported architecture: $archName")
     }
     return "lib/$osName/$arch/$libName"
 }
+
+private fun File.resolveOrNull(path: String) = resolve(path).takeIf { it.exists() }

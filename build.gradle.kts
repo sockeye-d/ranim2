@@ -21,6 +21,7 @@ dependencies {
     implementation(libs.treesitter)
     implementation(libs.kotlinx.serialization.json)
     implementation(projects.languages.kotlin)
+    implementation(projects.languages.odin)
 }
 
 kotlin {

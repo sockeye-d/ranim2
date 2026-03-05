@@ -6,7 +6,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.createCoroutine
 import kotlin.coroutines.resume
 
-class ElementAnimation : Scene(), Animation {
+class AnimatedScene : Scene(), Animated {
     internal lateinit var continuation: Continuation<Unit>
     override var isFinished = false
 
@@ -24,9 +24,9 @@ class ElementAnimation : Scene(), Animation {
  * Runs [animations] in parallel. If any of them inherit from [Element], they are automatically added as children to
  * be drawn, and automatically removed once they finish.
  */
-suspend fun ElementAnimation.yield(vararg animations: Animation) {
+suspend fun AnimatedScene.yield(vararg animations: Animated) {
     val elements = animations.filterIsInstance<Element>()
-    val finishedAnimations = mutableSetOf<Animation>()
+    val finishedAnimations = mutableSetOf<Animated>()
     children += elements
     while (finishedAnimations.size < animations.size) {
         for (animation in animations.filter { it !in finishedAnimations }) {
@@ -42,18 +42,19 @@ suspend fun ElementAnimation.yield(vararg animations: Animation) {
     }
 }
 
-suspend fun ElementAnimation.yield(frames: Frames) {
+suspend fun AnimatedScene.yield(frames: Frames) {
     for (frame in 1..frames) {
         yield()
     }
 }
 
-fun animation(block: suspend ElementAnimation.() -> Unit) = ElementAnimation().apply {
+fun animation(block: suspend AnimatedScene.() -> Unit) = AnimatedScene().apply {
     continuation = block.createCoroutine(
         receiver = this,
         completion = Continuation(EmptyCoroutineContext) { result ->
             if (result.isFailure) {
                 println("Animation cancelled with exception: $result")
+                println("Backtrace: ${result.exceptionOrNull()?.stackTraceToString()}")
             }
             isFinished = true
         }

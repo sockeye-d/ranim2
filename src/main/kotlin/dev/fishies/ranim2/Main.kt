@@ -44,6 +44,7 @@ import dev.fishies.ranim2.core.tween
 import dev.fishies.ranim2.core.yield
 import dev.fishies.ranim2.elements.makeText
 import dev.fishies.ranim2.languages.kotlin.TreeSitterKotlin
+import dev.fishies.ranim2.languages.odin.TreeSitterOdin
 //import dev.fishies.ranim2.languages.kotlin.TreeSitterKotlin
 //import dev.fishies.ranim2.languages.kotlin.TreeSitterKotlin
 import dev.fishies.ranim2.ranim2.generated.resources.Res
@@ -96,31 +97,38 @@ fun Sequence<QueryMatch>.toAnnotations() = mapNotNull { q ->
 
 @OptIn(ExperimentalTextApi::class)
 val anim = animation {
-    val code = $$"""
-    |fun main() {
-    |    @OptIn(ExperimentalTextApi::class)
-    |    val anim = animation {
-    |        val code = ""$${'"'}fun main() {
-    |               val x = "world!"
-    |               println("Hello ${x}")
-    |            }""$${'"'}.trimMargin()
-    |        val shape = makeText(code, FontFamily("Iosevka Nerd Font"))
-    |        shape.annotations = TreeSitterKotlin.highlight(shape.text).toAnnotations().toList()
-    |        val length = 120
-    |        yield(shape::position.tween(to = Offset(20f, 40f), length = length, tweener = quadratic(Out)))
-    |        //while (true) {
-    |            //yield(shape::position.tween(to = Offset(20f, 100f), length = length, tweener = quadratic(In)))
-    |        //}
-    |    }
-    |}""".trimMargin()
+    val code = """
+some_string := "Hello"
+for character in some_string {
+	fmt.println(character)
+}
+
+some_array := [3]int{1, 4, 9}
+for value in some_array {
+	fmt.println(value)
+}
+
+some_slice := []int{1, 4, 9}
+for value in some_slice {
+	fmt.println(value)
+}
+
+some_dynamic_array := [dynamic]int{1, 4, 9} // must be enabled with `#+feature dynamic-literals`
+defer delete(some_dynamic_array)
+for value in some_dynamic_array {
+	fmt.println(value)
+}
+
+some_map := map[string]int{"A" = 1, "C" = 9, "B" = 4} // must be enabled with `#+feature dynamic-literals`
+defer delete(some_map)
+for key in some_map {
+	fmt.println(key)
+}""".trimMargin()
     println(code)
-    val shape = makeText(code, FontFamily("Iosevka Nerd Font"), color = Color.Red)
-    shape.annotations = TreeSitterKotlin.highlight(shape.text).toAnnotations().toList()
+    val shape = makeText(code, FontFamily("Iosevka Nerd Font"), color = catppuccinMocha["text"].color)
+    shape.annotations = TreeSitterOdin.highlight(shape.text).toAnnotations().toList()
     val length = 120
     yield(shape::position.tween(to = Offset(20f, 40f), length = length, tweener = quadratic(Out)))
-    //while (true) {
-        //yield(shape::position.tween(to = Offset(20f, 100f), length = length, tweener = quadratic(In)))
-    //}
 }
 
 private fun loadSvg(path: String): Painter =

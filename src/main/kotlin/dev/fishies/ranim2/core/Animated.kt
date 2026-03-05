@@ -1,6 +1,6 @@
 package dev.fishies.ranim2.core
 
-interface Animation {
+interface Animated {
     val isFinished: Boolean
 
     /**

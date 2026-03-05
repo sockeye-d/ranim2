@@ -1,3 +1,6 @@
 [submodule "languages/kotlin/tree-sitter-kotlin"]
 	path = languages/kotlin/tree-sitter-kotlin
 	url = https://github.com/fwcd/tree-sitter-kotlin
+[submodule "languages/odin/tree-sitter-odin"]
+	path = languages/odin/tree-sitter-odin
+	url = https://github.com/MineBill/tree-sitter-odin

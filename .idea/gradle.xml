@@ -23,6 +23,7 @@
             <option value="$PROJECT_DIR$/languages" />
             <option value="$PROJECT_DIR$/languages/common" />
             <option value="$PROJECT_DIR$/languages/kotlin" />
+            <option value="$PROJECT_DIR$/languages/odin" />
           </set>
         </option>
         <option name="resolveExternalAnnotations" value="true" />

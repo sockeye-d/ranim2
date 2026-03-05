@@ -45,7 +45,8 @@ data class SyntaxHighlighterTheme(
             }
             name = name.substringBeforeLast('.')
         }
-        return SpanStyle(color = Color.Red)
+        System.err.println("Style $name not found")
+        return SpanStyle(color = Color.Blue)
     }
 
     internal object Serializer : KSerializer<SyntaxHighlighterTheme> {
