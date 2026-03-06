@@ -53,7 +53,7 @@ abstract class Container<ContainerT : Any>(protected val makeContainer: () -> Co
         }
     }
 
-    fun <PropertyT> parentAttached(
+    fun <PropertyT> attached(
         containerProperty: KMutableProperty1<ContainerT, PropertyT>,
         default: () -> PropertyT,
     ) = object : ReadWriteProperty<Element, PropertyT> {
@@ -89,8 +89,10 @@ inline fun <reified ContainerT : Any, PropertyT> parentAttached(
      * To get a value, get the container, then access the property provided by [containerProperty].
      */
     override fun getValue(thisRef: Element, property: KProperty<*>): PropertyT {
-        return thisRef.getParentContainer().attachedPropertyContainers[thisRef]?.let { containerProperty.get(it as ContainerT) }
-            ?: default()
+        return thisRef.getParentContainer().attachedPropertyContainers[thisRef]?.let {
+            @Suppress("USELESS_CAST") // Not actually useless.
+            containerProperty.get(it as ContainerT)
+        } ?: default()
     }
 
     override fun setValue(thisRef: Element, property: KProperty<*>, value: PropertyT) {

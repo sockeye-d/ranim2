@@ -13,11 +13,6 @@ import dev.fishies.ranim2.core.Container
 import dev.fishies.ranim2.core.Element
 import dev.fishies.ranim2.core.parentAttached
 
-class BoxContainerModifiers {
-    var fraction: Float? by mutableStateOf(null)
-    internal var childSize = ChildSize()
-}
-
 enum class Axis {
     X,
     Y;
@@ -39,6 +34,11 @@ enum class Axis {
             Y -> y
         }
     }
+}
+
+class BoxContainerModifiers {
+    var fraction: Float? by mutableStateOf(null)
+    internal var childSize = ChildSize()
 }
 
 class BoxContainer(_axis: Axis, _separation: Float) : Container<BoxContainerModifiers>(::BoxContainerModifiers) {
@@ -152,7 +152,7 @@ class BoxContainer(_axis: Axis, _separation: Float) : Container<BoxContainerModi
         Axis.Y -> Offset(y, x)
     }
 
-    private var Element.childSize by parentAttached(BoxContainerModifiers::childSize, default = { ChildSize() })
+    private var Element.childSize by attached(BoxContainerModifiers::childSize, default = { ChildSize() })
 }
 
 var Element.fraction by parentAttached(BoxContainerModifiers::fraction, default = { null })
