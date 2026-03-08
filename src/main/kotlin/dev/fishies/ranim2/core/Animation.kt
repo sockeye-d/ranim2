@@ -57,6 +57,6 @@ fun animation(block: suspend Animation.() -> Unit) = Animation().apply {
                 println("Backtrace: ${result.exceptionOrNull()?.stackTraceToString()}")
             }
             isFinished = true
-        }
+        },
     )
 }

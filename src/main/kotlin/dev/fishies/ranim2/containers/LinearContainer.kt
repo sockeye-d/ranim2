@@ -8,10 +8,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import dev.fishies.ranim2.containers.Axis.Companion.get
+import dev.fishies.ranim2.containers.LinearContainer.Properties
 import dev.fishies.ranim2.core.CompositeElement
 import dev.fishies.ranim2.core.Container
 import dev.fishies.ranim2.core.Element
-import dev.fishies.ranim2.core.parentAttached
+import dev.fishies.ranim2.core.attached
 
 enum class Axis {
     X,
@@ -36,12 +37,7 @@ enum class Axis {
     }
 }
 
-class BoxContainerModifiers {
-    var fraction: Float? by mutableStateOf(null)
-    internal var childSize = ChildSize()
-}
-
-class BoxContainer(_axis: Axis, _separation: Float) : Container<BoxContainerModifiers>(::BoxContainerModifiers) {
+class LinearContainer(_axis: Axis, _separation: Float) : Container() {
     var axis by mutableStateOf(_axis)
     var separation by mutableStateOf(_separation)
 
@@ -62,29 +58,32 @@ class BoxContainer(_axis: Axis, _separation: Float) : Container<BoxContainerModi
         var stretchMin = 0.0f
         var stretchAvailable = 0.0f
 
+        val childSizes = ArrayList<ChildSize>(childrenToLayout.size)
+
         for (child in childrenToLayout) {
-            val (childAlongAxis, _) = child.minimumSize.convertXyMainCross()
+            val childAlongAxisSize = child.minimumSize[axis]
+            val fraction = child.fraction
             val childSize = ChildSize(
-                minimSize = childAlongAxis,
-                finalSize = childAlongAxis,
-                willStretch = child.fraction != null,
-                fraction = child.fraction ?: 0.0f
+                minimSize = childAlongAxisSize,
+                finalSize = childAlongAxisSize,
+                willStretch = fraction != null,
+                fraction = fraction ?: 0.0f
             )
-            child.childSize = childSize
             stretchMin += childSize.minimSize
             if (childSize.willStretch) {
                 stretchAvailable += childSize.minimSize
                 fractionTotal += childSize.fraction
             }
+            childSizes.add(childSize)
         }
+
         val stretchMax = alongAxis - totalSeparation
         val stretchDiff = (stretchMax - stretchMin).coerceAtLeast(0.0f)
         stretchAvailable += stretchDiff
 
-        while (fractionTotal > 0.0) {
+        while (childSizes.any { it.willStretch }) {
             var refitSuccessful = true
-            for (child in childrenToLayout) {
-                val childSize = child.childSize
+            for (childSize in childSizes) {
                 if (childSize.willStretch) {
                     val finalSize = stretchAvailable * childSize.fraction / fractionTotal
                     if (finalSize < childSize.minimSize) {
@@ -107,9 +106,7 @@ class BoxContainer(_axis: Axis, _separation: Float) : Container<BoxContainerModi
         var first = true
         var offset = 0.0f
 
-        for (child in childrenToLayout) {
-            val childSize = child.childSize
-
+        for ((child, childSize) in childrenToLayout.zip(childSizes)) {
             if (first) {
                 first = false
             } else {
@@ -120,11 +117,11 @@ class BoxContainer(_axis: Axis, _separation: Float) : Container<BoxContainerModi
                 Offset(offset, 0.0f).convertXyMainCross(), Size(childSize.finalSize, acrossAxis).convertXyMainCross()
             )
 
-            println(childSize)
-            println("Placed at $offset")
             child.fitInRect(rect)
             offset += childSize.finalSize
         }
+
+        //size = Size(size.width.coerceAtLeast(minimumSize.width), size.height.coerceAtLeast(minimumSize.height))
     }
 
     @Suppress("NOTHING_TO_INLINE")
@@ -152,10 +149,12 @@ class BoxContainer(_axis: Axis, _separation: Float) : Container<BoxContainerModi
         Axis.Y -> Offset(y, x)
     }
 
-    private var Element.childSize by attached(BoxContainerModifiers::childSize, default = { ChildSize() })
+    class Properties {
+        var fraction: Float? by mutableStateOf(null)
+    }
 }
 
-var Element.fraction by parentAttached(BoxContainerModifiers::fraction, default = { null })
+var Element.fraction by attached<_, _, LinearContainer>(Properties::fraction, default = { null })
 
 internal data class ChildSize(
     val minimSize: Float = 0.0f,
@@ -164,8 +163,9 @@ internal data class ChildSize(
     var fraction: Float = 0.0f,
 )
 
-fun CompositeElement.boxContainer(
+fun CompositeElement.linearContainer(
     axis: Axis = Axis.X,
     separation: Float = 0.0f,
-    contents: BoxContainer.() -> Unit,
-) = BoxContainer(axis, separation).also(::addChild).apply(contents)
+    contents: LinearContainer.() -> Unit,
+) = LinearContainer(axis, separation).also(::addChild).apply(contents)
+

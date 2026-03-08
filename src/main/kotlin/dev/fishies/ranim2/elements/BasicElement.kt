@@ -7,8 +7,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import dev.fishies.ranim2.core.Element
+import kotlin.reflect.KClass
 
 abstract class BasicElement(position: Offset, size: Size = Size.Unspecified) : Element {
+    override var attachedProperties by mutableStateOf(emptyMap<KClass<*>, Any?>())
+    override var children by mutableStateOf(emptyList<Element>())
+
     override var parent: Element? by mutableStateOf(null)
     override fun runLayoutPass() {}
 

@@ -67,8 +67,6 @@ private fun Project.generateTreeSitterParser(nameSupplier: () -> String, moduleS
         val generateGrammarFilesTask by tasks.named<GrammarFilesTask>("generateGrammarFiles")
         val generatedSrc: Directory by generateGrammarFilesTask.generatedSrc
 
-        logger.log(LogLevel.ERROR, generatedSrc.toString())
-
         extensions.configure<KotlinMultiplatformExtension> {
             jvm()
             jvmToolchain(21)
