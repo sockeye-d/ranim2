@@ -21,4 +21,6 @@ abstract class BasicElement(position: Offset, size: Size = Size.Unspecified) : E
     override var visible by mutableStateOf(true)
 
     override val minimumSize = size
+
+    override fun toString() = stringRepresentation
 }

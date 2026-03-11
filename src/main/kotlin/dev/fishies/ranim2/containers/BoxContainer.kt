@@ -20,7 +20,7 @@ import kotlin.contracts.contract
 
 class BoxContainer : Container() {
     override val minimumSize by derivedStateOf {
-        Size(
+        if (children.isEmpty()) Size.Zero else Size(
             layoutableChildren.maxOf { it.minimumSize.width },
             layoutableChildren.maxOf { it.minimumSize.height },
         )

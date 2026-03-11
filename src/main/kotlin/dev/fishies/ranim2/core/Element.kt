@@ -19,6 +19,15 @@ interface Element {
     fun runLayoutPass()
 
     operator fun <T : Element> T.invoke(block: T.() -> Unit) = apply(block)
+
+    fun propertyList(): Map<String, String> = mapOf(
+        "position" to position.toString(),
+        "size" to size.toString(),
+        "visible" to visible.toString(),
+    )
+
+    val stringRepresentation: String
+        get() = "${this::class.simpleName}(${propertyList().entries.joinToString { (name, value) -> "${name}=${value}" }})"
 }
 
 fun Element.treeString(): String = buildString {

@@ -46,6 +46,7 @@ import dev.fishies.ranim2.elements.layer
 import dev.fishies.ranim2.elements.makePainter
 import dev.fishies.ranim2.elements.makeRectangle
 import dev.fishies.ranim2.elements.makeText
+import dev.fishies.ranim2.elements.tween
 import dev.fishies.ranim2.ranim2.generated.resources.Res
 import dev.fishies.ranim2.theming.Theme
 import dev.fishies.ranim2.theming.defaultTheme
@@ -59,6 +60,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.imageio.ImageIO
+import kotlin.random.Random
 
 //private fun svgPainter(resource: DrawableResource): Painter {
 //    resource
@@ -81,70 +83,75 @@ fun bug() = animation {
     circle.size *= 0.1f
 
     repeat(10) {
-        yield(circle::position.tween(to = Offset(10f, it * 10f), length = 50, tweener = cubic(InOut)))
+        yield(circle::position.tween(to = Offset(Random.nextFloat() * 30.0f + 10.0f, Random.nextFloat() * 30.0f + 10.0f), length = 50, tweener = cubic(InOut)))
         yield(frames = 20)
     }
 }
 
 @OptIn(ExperimentalTextApi::class)
-val anim = animation {
-    theme = catppuccinMocha
-    var inner: Element
-    Container.drawContainerOutlines = true
-    var container: BoxContainer
+val anim by lazy {
+    animation {
+        theme = catppuccinMocha
+        var inner: Element
+        Container.drawContainerOutlines = true
+        var container: BoxContainer
 
-    layer {
-        alpha = 0.5f
-        renderEffect = BlurEffect(10.0f, 10.0f, TileMode.Decal)
-        container = boxContainer {
-            inner = linearContainer(separation = 3.0f) {
-                anchor = Anchor.center
-                makeRectangle(Size(20f, 20f), theme.primary, radius = 5.0f)() {
-                    fraction = 1.0f
-                }
-                boxContainer {
-                    fraction = 1.0f
-                    makeRectangle(Size(20f, 20f), theme.secondary, radius = 5.0f)
-                    makeText("This is some text!", color = theme.onSecondary)() {
-                        alignment = Center
-                        anchor = Anchor.Wide.m
+        val sceneLayer = layer {
+            alpha = 0.5f
+            renderEffect = BlurEffect(10.0f, 10.0f, TileMode.Decal)
+            container = boxContainer {
+                inner = linearContainer(separation = 3.0f) {
+                    anchor = Anchor.center
+                    makeRectangle(Size(20f, 20f), theme.primary, radius = 5.0f)() {
+                        fraction = 1.0f
                     }
-                }
-                makeRectangle(Size(20f, 20f), theme.primaryVariant, radius = 5.0f)() {
-                    fraction = 1.0f
+                    boxContainer {
+                        fraction = 1.0f
+                        makeRectangle(Size(20f, 20f), theme.secondary, radius = 5.0f)
+                        makeText("This is some text!", color = theme.onSecondary)() {
+                            alignment = Center
+                            anchor = Anchor.Wide.m
+                        }
+                    }
+                    makeRectangle(Size(20f, 20f), theme.primaryVariant, radius = 5.0f)() {
+                        fraction = 1.0f
+                    }
                 }
             }
         }
+
+        yield(container::size.tween(to = Size(500f, 120f), length = 50, tweener = cubic(Out)))
+        yield(sceneLayer::renderEffect.tween(to = BlurEffect(30.0f, 30.0f, TileMode.Decal), length = 200))
+        yield(sceneLayer::renderEffect.tween(to = BlurEffect(30.0f, 5.0f, TileMode.Decal), length = 200))
+        yield(sceneLayer::renderEffect.tween(to = null, length = 200))
+        yield(bug())
+
+        yield(
+            animation {
+                while (true) {
+                    fun animateInnerTo(anchor: Anchor, length: Int = 100) =
+                        inner::anchor.tween(to = anchor, length = length, tweener = cubic(InOut))
+
+                    yield(animateInnerTo(Anchor.Shrink.tl, 200))
+                    yield(animateInnerTo(Anchor.Shrink.tm))
+                    yield(animateInnerTo(Anchor.Shrink.tr))
+                    yield(animateInnerTo(Anchor.Shrink.ml))
+                    yield(animateInnerTo(Anchor.Shrink.mm))
+                    yield(animateInnerTo(Anchor.Shrink.mr))
+                    yield(animateInnerTo(Anchor.Shrink.bl))
+                    yield(animateInnerTo(Anchor.Shrink.bm))
+                    yield(animateInnerTo(Anchor.Shrink.br))
+                    yield(animateInnerTo(Anchor.fill, 200))
+                }
+            },
+            //animation {
+            //    while (true) {
+            //        yield(inner::color.tween(to = theme.secondary, length = 50, tweener = cubic(Out)))
+            //        yield(inner::color.tween(to = theme.primary, length = 50, tweener = cubic(Out)))
+            //    }
+            //}
+        )
     }
-
-    yield(container::size.tween(to = Size(500f, 120f), length = 200, tweener = cubic(Out)))
-    yield(bug())
-
-    yield(
-        animation {
-            while (true) {
-                fun animateInnerTo(anchor: Anchor, length: Int = 100) =
-                    inner::anchor.tween(to = anchor, length = length, tweener = cubic(InOut))
-
-                yield(animateInnerTo(Anchor.Shrink.tl, 200))
-                yield(animateInnerTo(Anchor.Shrink.tm))
-                yield(animateInnerTo(Anchor.Shrink.tr))
-                yield(animateInnerTo(Anchor.Shrink.ml))
-                yield(animateInnerTo(Anchor.Shrink.mm))
-                yield(animateInnerTo(Anchor.Shrink.mr))
-                yield(animateInnerTo(Anchor.Shrink.bl))
-                yield(animateInnerTo(Anchor.Shrink.bm))
-                yield(animateInnerTo(Anchor.Shrink.br))
-                yield(animateInnerTo(Anchor.fill, 200))
-            }
-        },
-        //animation {
-        //    while (true) {
-        //        yield(inner::color.tween(to = theme.secondary, length = 50, tweener = cubic(Out)))
-        //        yield(inner::color.tween(to = theme.primary, length = 50, tweener = cubic(Out)))
-        //    }
-        //}
-    )
 }
 
 @OptIn(InternalComposeUiApi::class)

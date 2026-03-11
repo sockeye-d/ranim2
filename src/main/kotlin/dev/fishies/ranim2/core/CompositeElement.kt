@@ -23,7 +23,7 @@ open class CompositeElement(_position: Offset = Offset.Zero, _size: Size = Size.
     override var position by mutableStateOf(_position)
     override var size by mutableStateOf(_size)
     override val minimumSize: Size
-        get() = Size(children.maxOf { it.minimumSize.width }, children.maxOf { it.minimumSize.height })
+        get() = if (children.isEmpty()) Size.Zero else Size(children.maxOf { it.minimumSize.width }, children.maxOf { it.minimumSize.height })
     override var visible by mutableStateOf(true)
     override var children by mutableStateOf(emptyList<Element>())
     var transform by mutableStateOf(Matrix())
@@ -73,6 +73,8 @@ open class CompositeElement(_position: Offset = Offset.Zero, _size: Size = Size.
         children = children.filter { it !in elements }
         elements.forEach { it.parent = null }
     }
+
+    override fun toString() = stringRepresentation
 }
 
 inline fun <reified ContainerT : Any, PropertyT, reified ParentT : Element?> attached(

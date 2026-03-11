@@ -44,7 +44,7 @@ class LinearContainer(_axis: Axis, _separation: Float) : Container() {
     val crossAxis by derivedStateOf { axis.opposite }
 
     override val minimumSize by derivedStateOf {
-        constructSize(
+        if (children.isEmpty()) Size.Zero else constructSize(
             layoutableChildren.foldIndexed(0.0f) { i, acc, e -> acc + e.minimumSize[axis] + (if (i == 0) 0.0f else separation) },
             layoutableChildren.maxOf { it.minimumSize[crossAxis] },
         )
