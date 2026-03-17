@@ -13,7 +13,7 @@ dependencies {
     implementation(libs.material.icons)
     implementation(libs.kotlin.reflect)
 
-    implementation(projects.core)
+    compileOnly(projects.core)
 }
 
 kotlin {

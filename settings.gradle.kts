@@ -41,8 +41,13 @@ plugins {
 rootProject.name = "ranim2"
 
 includeBuild("build-logic")
+includeBuild("plugin")
 include(":core")
 include(":gui")
+
+val coreSelector = project(":core")
+
+includeBuild("test")
 
 for (project in rootDir.resolve("languages").list()) {
     include(":languages:$project")

@@ -12,10 +12,11 @@ group = "dev.fishies.ranim2"
 version = "1.0.0"
 
 dependencies {
-    implementation(compose.foundation)
-    implementation(compose.runtime)
+    api(compose.foundation)
+    api(compose.runtime)
     implementation(libs.compose.resources)
-    implementation(libs.material.icons)
+
+    compileOnly("com.google.devtools.ksp:symbol-processing-api:${libs.versions.kotlin.get()}")
     implementation(libs.kotlin.reflect)
     implementation(libs.treesitter)
     implementation(libs.kotlinx.serialization.json)
