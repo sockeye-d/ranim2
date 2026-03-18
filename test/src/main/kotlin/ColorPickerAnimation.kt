@@ -92,3 +92,6 @@ fun colorPickerAnimation() = animation {
         )
     }
 }
+
+@AnimationProvider
+fun anotherAnimation() = animation {  }
