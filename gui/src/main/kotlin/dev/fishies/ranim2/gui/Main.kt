@@ -10,8 +10,9 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import dev.fishies.ranim2.Animation
 import dev.fishies.ranim2.ksp.AnimationMetadata
+import dev.fishies.ranim2.theming.LocalTheme
 import dev.fishies.ranim2.theming.Theme
-import dev.fishies.ranim2.theming.defaultTheme
+import dev.fishies.ranim2.util.loadJson
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -26,10 +27,10 @@ import kotlin.time.Duration.Companion.milliseconds
 @Stable
 data class AnimationData(
     val name: String,
-    val fn: () -> Animation,
+    val fn: () -> Animation?,
 )
 
-@OptIn(ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class, ExperimentalCoroutinesApi::class)
 fun main(args: Array<String>) = application {
     val metadataPath = remember {
         Path.of(args.firstOrNull() ?: error("Path to metadata file must be provided")).absolute()
@@ -38,28 +39,63 @@ fun main(args: Array<String>) = application {
     val animations by remember {
         flow {
             emit(Json.decodeFromStream(metadataPath.inputStream()))
-            val watcher = FileSystems.getDefault().newWatchService()
-            watchFilesystem(watcher, metadataPath.parent)
-        }.flowOn(Dispatchers.IO).map { metadata ->
-            val path = Path.of(metadata.jarFileOutputPath).absolute().toUri().toURL()
-            println(path)
-            val loader = URLClassLoader.newInstance(arrayOf(path))
-            Thread.currentThread().contextClassLoader = loader
-            metadata.animations.map {
-                val method = loader.loadClass(it.ownerClassName).getMethod(it.fnName)
-                AnimationData(it.fnName) {
-                    method.invoke(null) as Animation
+            watchFilesystem(FileSystems.getDefault().newWatchService(), metadataPath.parent)
+        }.flowOn(Dispatchers.IO).transformLatest { metadata ->
+            emit(Outcome.Progress)
+            val jarFilePath = Path.of(metadata.jarFileOutputPath)
+            while (true) {
+                delay(500.milliseconds)
+                try {
+                    val url = jarFilePath.absolute().toUri().toURL()
+                    emit(Outcome.Success(metadata.animations.map {
+                        AnimationData(it.fnName) {
+                            val oldLoader = Thread.currentThread().contextClassLoader
+                            try {
+                                val loader = URLClassLoader.newInstance(arrayOf(url))
+                                val method = loader.loadClass(it.ownerClassName).getMethod(it.fnName)
+                                Thread.currentThread().contextClassLoader = loader
+                                method.invoke(null) as Animation
+                            } catch (e: Exception) {
+                                println("An exception occurred when attempting to load animation ${it.ownerClassName}.${it.fnName}: $e")
+                                println("Stack trace: ${e.stackTraceToString()}")
+                                null
+                            } finally {
+                                Thread.currentThread().contextClassLoader = oldLoader
+                            }
+                        }
+                    }))
+                    break
+                } catch (e: ReflectiveOperationException) {
+                    println("Retrying due to $e")
                 }
             }
         }
-    }.collectAsState(emptyList())
+    }.collectAsState(Outcome.Progress)
 
-    @OptIn(InternalComposeUiApi::class) CompositionLocalProvider(LocalGraphicsContext provides remember { SkiaGraphicsContext() }) {
-        MaterialTheme(colors = defaultTheme.toComposeColors()) {
+    val theme = loadJson<Theme>("catppuccin-mocha.json")
+
+    @OptIn(InternalComposeUiApi::class) CompositionLocalProvider(
+        LocalGraphicsContext provides remember { SkiaGraphicsContext() },
+        LocalTheme provides theme,
+    ) {
+        MaterialTheme(colors = LocalTheme.current.toComposeColors()) {
             Window(onCloseRequest = ::exitApplication, title = "My Desktop App") {
+                // val animations by remember {
+                //     flow {
+                //         while (true) {
+                //             emit(Outcome.Progress)
+                //             delay(1.seconds)
+                //             emit(Outcome.Success(emptyList<AnimationData>()))
+                //             delay(1.seconds)
+                //         }
+                //     }
+                // }.collectAsState(Outcome.Progress)
                 var paused by remember { mutableStateOf(true) }
                 var activeAnimation: Animation? by remember { mutableStateOf(null) }
-                MainScreen(animations, paused, { paused = it }, activeAnimation, { activeAnimation = it })
+                MainScreen(animations, paused, { paused = it }, activeAnimation) {
+                    activeAnimation = it
+                    activeAnimation?.tick()
+                }
             }
         }
     }
@@ -91,7 +127,7 @@ suspend fun FlowCollector<AnimationMetadata>.watchFilesystem(watcher: WatchServi
         var key: WatchKey? = null
         while (key == null) {
             key = watcher.poll()
-            delay(500.milliseconds)
+            delay(1.milliseconds)
         }
 
         for (event in key.pollEvents()) {
@@ -102,5 +138,7 @@ suspend fun FlowCollector<AnimationMetadata>.watchFilesystem(watcher: WatchServi
             val path = event.context() as? Path ?: continue
             emit(Json.decodeFromStream(path.inputStream()))
         }
+
+        key.reset()
     }
 }

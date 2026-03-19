@@ -31,6 +31,8 @@ enum class ThemeColor(
     Background2(Theme::background2, Theme::onBackground),
     Surface(Theme::surface, Theme::onSurface),
     Error(Theme::error, Theme::onError),
+    Success(Theme::success, Theme::onSuccess),
+    Warning(Theme::warning, Theme::warning),
 }
 
 @Serializable
@@ -43,11 +45,15 @@ data class Theme(
     val background2: Color,
     val surface: Color,
     val error: Color,
+    val success: Color,
+    val warning: Color,
     @SerialName("on_primary") val onPrimary: Color,
     @SerialName("on_secondary") val onSecondary: Color,
     @SerialName("on_background") val onBackground: Color,
     @SerialName("on_surface") val onSurface: Color,
     @SerialName("on_error") val onError: Color,
+    @SerialName("on_success") val onSuccess: Color = onError,
+    @SerialName("on_warning") val onWarning: Color = onError,
     @SerialName("is_light") val isLight: Boolean,
     val syntax: SyntaxHighlighterTheme,
 ) {
@@ -120,6 +126,8 @@ val defaultTheme = Theme(
     background2 = Color(0xFF181818),
     surface = Color(0xFF2F2F2F),
     error = Color(0xFFFF7D68),
+    success = Color(0xFFAEFF68),
+    warning = Color(0xFFFFD968),
     onPrimary = Color(0xFF0F0F0F),
     onSecondary = Color(0xFF0F0F0F),
     onBackground = Color(0xFFF0F0F0),
@@ -143,3 +151,5 @@ var Element.theme by attached<_, _, Element?>(ThemeProperties::theme, recursive 
 var Element.backgroundColor by attached<_, _, Element?>(
     BackgroundProperties::backgroundColor, recursive = true
 ) { ThemeColor.Background }
+
+val LocalTheme = staticCompositionLocalOf { defaultTheme }

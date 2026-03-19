@@ -14,7 +14,7 @@ dependencies {
     implementation(libs.kotlin.reflect)
     implementation(libs.kotlinx.serialization.json)
 
-    compileOnly(projects.core)
+    implementation(projects.core)
 }
 
 kotlin {
