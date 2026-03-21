@@ -11,8 +11,11 @@ import androidx.compose.material.icons.rounded.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
@@ -50,8 +53,7 @@ fun MainScreen(
                             setActiveAnimation = setActiveAnimation,
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         )
-                        // AnimationPicker(
-                        // )
+                        ScrubBar(modifier = Modifier.height(16.dp).fillMaxWidth())
                     }
                 }
             }
@@ -90,7 +92,11 @@ private fun PlayControlBar(
             }
         }
         Box(Modifier.weight(1f)) {
-            AnimationPicker(animations, setActiveAnimation = setActiveAnimation, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp))
+            AnimationPicker(
+                animations,
+                setActiveAnimation = setActiveAnimation,
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp)
+            )
         }
     }
 }
@@ -120,31 +126,6 @@ private fun AnimationPicker(
             }
         }
     }
-    // TextField(
-    //     value = selectedOption?.name ?: "None",
-    //     onValueChange = {},
-    //     readOnly = true,
-    //     trailingIcon = {
-    //         ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-    //     },
-    //     colors = ExposedDropdownMenuDefaults.textFieldColors(),
-    //     modifier = Modifier.fillMaxWidth(),
-    //     enabled = !disabled,
-    // )
-    //
-    // DropdownMenu(
-    //     expanded,
-    //     onDismissRequest = { expanded = false },
-    //     modifier = Modifier.exposedDropdownSize(),
-    // ) {
-    //     if (animations is Outcome.Success) {
-    //         for (animation in animations.data) {
-    //             DropdownMenuItem(onClick = { selectedOption = animation }) {
-    //                 Text(animation.name)
-    //             }
-    //         }
-    //     }
-    // }
 }
 
 @Composable
@@ -184,6 +165,27 @@ private fun DrawScope.drawBorderGradient(color: Color, width: Float = 15.0f) {
     val vBrush = Brush.verticalGradient(*vStops)
     drawRect(hBrush)
     drawRect(vBrush)
+}
+
+@Stable
+class ScrubBarState {
+    var scrollAmount by mutableStateOf(0f)
+    var zoom by mutableStateOf(1f)
+}
+
+@Composable
+fun ScrubBar(state: ScrubBarState = remember { ScrubBarState() }, modifier: Modifier = Modifier) {
+    Canvas(modifier.onRotaryScrollEvent { e ->
+        state.scrollAmount += e.verticalScrollPixels
+        true
+    }) {
+        drawRect(Color.Blue)
+        for (i in -100..100) {
+            val absoluteX = i * 50f
+            val x = absoluteX * state.zoom + state.scrollAmount
+            drawRect(Color.White, Offset(x, 0.0f), Size(2.0f, size.height))
+        }
+    }
 }
 
 @Preview
