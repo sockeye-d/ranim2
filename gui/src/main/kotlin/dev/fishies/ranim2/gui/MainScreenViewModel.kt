@@ -65,19 +65,23 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
     @OptIn(FlowPreview::class)
     val animations = if (metadataPath != null) {
         flow {
-            emit(metadataPath)
-            watchFile(FileSystems.getDefault().newWatchService(), metadataPath)
-        }.flowOn(Dispatchers.IO).map {
-            Json.decodeFromStream<AnimationMetadata>(it.inputStream())
-        }.transformLatest { metadata ->
-            emit(Outcome.Progress)
-            flow {
-                watchFile(
-                    FileSystems.getDefault().newWatchService(),
-                    Path.of(metadata.jarFileOutputPath)
-                )
-            }.debounce(500.milliseconds).first()
-            emit(Outcome.Success(metadata))
+            emit(metadataPath to true)
+            flow { watchFile(FileSystems.getDefault().newWatchService(), metadataPath) }.collect { emit(it to false) }
+        }.flowOn(Dispatchers.IO).map { (it, force) ->
+            Json.decodeFromStream<AnimationMetadata>(it.inputStream()) to force
+        }.transformLatest { (metadata, force) ->
+            if (force) {
+                emit(Outcome.Success(metadata))
+            } else {
+                emit(Outcome.Progress)
+                flow {
+                    watchFile(
+                        FileSystems.getDefault().newWatchService(),
+                        Path.of(metadata.jarFileOutputPath)
+                    )
+                }.flowOn(Dispatchers.IO).debounce(500.milliseconds).first()
+                emit(Outcome.Success(metadata))
+            }
         }.transformLatest { metadata ->
             emit(Outcome.Progress)
             if (metadata is Outcome.Success) {
