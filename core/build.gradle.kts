@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.kotlinx.serialization)
 }
 
-group = "dev.fishies.ranim2"
+group = "dev.fishies.sailfish"
 version = "1.0.0"
 
 dependencies {

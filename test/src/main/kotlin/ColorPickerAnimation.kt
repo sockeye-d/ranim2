@@ -5,13 +5,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
-import dev.fishies.ranim2.*
-import dev.fishies.ranim2.containers.*
-import dev.fishies.ranim2.containers.Anchor
-import dev.fishies.ranim2.elements.rectangle
-import dev.fishies.ranim2.elements.text
-import dev.fishies.ranim2.theming.theme
-import dev.fishies.ranim2.tweener.*
+import dev.fishies.sailfish.*
+import dev.fishies.sailfish.containers.*
+import dev.fishies.sailfish.containers.Anchor
+import dev.fishies.sailfish.elements.rectangle
+import dev.fishies.sailfish.elements.text
+import dev.fishies.sailfish.theming.theme
+import dev.fishies.sailfish.tweener.*
 import kotlin.reflect.KProperty1
 
 private val loader = object {}::class.java.classLoader

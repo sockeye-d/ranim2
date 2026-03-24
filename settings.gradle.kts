@@ -38,7 +38,7 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-rootProject.name = "ranim2"
+rootProject.name = "sailfish"
 
 includeBuild("build-logic")
 includeBuild("plugin")

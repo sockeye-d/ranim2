@@ -1,0 +1,80 @@
+package dev.fishies.sailfish
+
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.*
+
+class Animation : dev.fishies.sailfish.CompositeElement(), dev.fishies.sailfish.Animated {
+    internal lateinit var continuation: Continuation<Unit>
+    override var isFinished = false
+    var ticks = 0
+        private set
+
+    override fun tick() {
+        continuation.resume(Unit)
+        ticks++
+    }
+
+    /**
+     * Waits for one frame.
+     */
+    suspend fun yield() = suspendCancellableCoroutine { continuation = it }
+
+    override fun propertyList() = emptyMap<String, String>()
+}
+
+val dev.fishies.sailfish.Element.absoluteTicks: Int
+    get() {
+        var e = this
+        while (true) {
+            e.parent.let { it ->
+                if (it == null) {
+                    break
+                } else {
+                    e = it
+                }
+            }
+        }
+        return (e as dev.fishies.sailfish.Animation).ticks
+    }
+
+/**
+ * Runs [animations] in parallel. If any of them inherit from [Element], they are automatically added as children to
+ * be drawn, and automatically removed once they finish.
+ */
+suspend fun Animation.yield(vararg animations: Animated) {
+    val elements = animations.filterIsInstance<Element>()
+    val finishedAnimations = mutableSetOf<Animated>()
+    addChild(elements)
+    while (finishedAnimations.size < animations.size) {
+        for (animation in animations.filter { it !in finishedAnimations }) {
+            animation.tick()
+            if (animation.isFinished) {
+                finishedAnimations.add(animation)
+
+                if (animation is Element) {
+                    removeChild(animation)
+                }
+            }
+        }
+        yield()
+    }
+}
+
+suspend fun Animation.yield(frames: Frames) {
+    for (frame in 1..frames) {
+        yield()
+    }
+}
+
+fun animation(block: suspend Animation.() -> Unit) = Animation().apply {
+    continuation = block.createCoroutine(
+        receiver = this,
+        completion = Continuation(EmptyCoroutineContext) { result ->
+            if (result.isFailure) {
+                // Propagate exception past suspend barriers.
+                throw result.exceptionOrNull()!!
+            }
+            isFinished = true
+        },
+    )
+}

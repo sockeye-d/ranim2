@@ -1,4 +1,4 @@
-# ranim2
+# sailfish
 
 A framework for building animations with code in Kotlin using Compose Desktop.
 

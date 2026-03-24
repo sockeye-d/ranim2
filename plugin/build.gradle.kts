@@ -20,8 +20,8 @@ dependencies {
 gradlePlugin {
     plugins {
         create("ranimAnimation") {
-            id = "dev.fishies.ranim2.plugin"
-            implementationClass = "dev.fishies.ranim2.plugin.AnimationProviderPlugin"
+            id = "dev.fishies.sailfish.plugin"
+            implementationClass = "dev.fishies.sailfish.plugin.AnimationProviderPlugin"
         }
     }
 }

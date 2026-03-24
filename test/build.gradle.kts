@@ -1,3 +1,3 @@
 plugins {
-    id("dev.fishies.ranim2.plugin")
+    id("dev.fishies.sailfish.plugin")
 }

@@ -21,7 +21,7 @@ fun <T> Property<T>.assign(value: T) {
 
 open class TsParserExtension {
     var name: String = ""
-    var module: String = "dev.fishies.ranim2.languages"
+    var module: String = "dev.fishies.sailfish.languages"
 }
 
 class TsLanguagePlugin : Plugin<Project> {
@@ -131,10 +131,10 @@ private fun Project.generateTreeSitterParser(nameSupplier: () -> String, moduleS
             )
         }
 
-        val baseInterface = "dev.fishies.ranim2.languages.common.TreeSitterLanguage"
+        val baseInterface = "dev.fishies.sailfish.languages.common.TreeSitterLanguage"
         val knownQueries = mapOf(
-            "highlights" to "dev.fishies.ranim2.languages.common.TreeSitterLanguage.Highlightable",
-            "tags" to "dev.fishies.ranim2.languages.common.TreeSitterLanguage.Taggable",
+            "highlights" to "dev.fishies.sailfish.languages.common.TreeSitterLanguage.Highlightable",
+            "tags" to "dev.fishies.sailfish.languages.common.TreeSitterLanguage.Taggable",
         )
 
         val modifyGeneratedFileTask = tasks.register("modifyGeneratedFile") {

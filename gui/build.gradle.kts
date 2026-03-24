@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
 }
 
-group = "dev.fishies.ranim2"
+group = "dev.fishies.sailfish"
 version = "1.0.0"
 
 dependencies {
