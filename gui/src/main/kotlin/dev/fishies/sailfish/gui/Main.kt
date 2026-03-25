@@ -5,7 +5,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import dev.fishies.sailfish.gui.util.*
+import dev.fishies.sailfish.gui.util.rememberSkiaGraphicsContext
+import dev.fishies.sailfish.gui.util.toComposeColors
 import dev.fishies.sailfish.theming.LocalTheme
 import dev.fishies.sailfish.theming.Theme
 import dev.fishies.sailfish.util.loadJson
@@ -27,12 +28,7 @@ fun main(args: Array<String>) = application {
 
         val animations by vm.animations.collectAsState(Outcome.Progress)
         val theme = loadJson<Theme>("catppuccin-mocha.json")
-        val paused = vm.paused.collectAsState().value
-        val activeAnimation = vm.activeAnimation.collectAsState().value
-        val activeAnimationData = vm.activeAnimationData.collectAsState().value
-        val stateObject = vm.cursorFrame.collectAsState()
-        val cursorFrame = remember { mutableStateFrom(stateObject, vm::setCursorFrame) }
-        val markers = vm.guiMarkerStorage.markers
+        val animationState by vm.animationState.collectAsState(null)
 
         LaunchedEffect(Unit) {
             vm.ready()
@@ -45,14 +41,12 @@ fun main(args: Array<String>) = application {
             ) {
                 MainScreen(
                     animations,
-                    paused,
+                    animationState,
+                    vm.cursorFrame.collectAsState().value,
+                    vm::setCursorFrame,
                     vm::setPaused,
-                    activeAnimation,
                     vm::setActiveAnimation,
-                    activeAnimationData,
-                    cursorFrame,
-                    markers,
-                    vm::modifyMarker,
+                    vm::setMarker,
                 )
             }
         }

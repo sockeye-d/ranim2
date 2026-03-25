@@ -67,13 +67,14 @@ private fun CompositeElement.colorPicker(state: ColorPickerState) = panel(radius
 @AnimationProvider
 fun colorPickerAnimation() = animation {
     // theme = catppuccinMocha
-    println("hi8")
     val state = ColorPickerState()
 
     val picker = colorPicker(state)
     picker.position = Offset(150f, 150f)
 
     yield("event")
+    yield("event2")
+    yield("event3")
 
     val colors = listOf(theme.primary, theme.secondary, theme.error)
 

@@ -1,16 +1,12 @@
 package dev.fishies.sailfish.gui
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.withFrameMillis
 import dev.fishies.sailfish.*
 import dev.fishies.sailfish.elements.text
 import dev.fishies.sailfish.gui.util.watchFile
 import dev.fishies.sailfish.ksp.AnimationMetadata
 import dev.fishies.sailfish.ksp.AnimationSymbol
-import dev.fishies.sailfish.Marker
-import dev.fishies.sailfish.MarkerStorage
-import dev.fishies.sailfish.Markers
-import dev.fishies.sailfish.animation
-import dev.fishies.sailfish.isPast
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.Json
@@ -19,16 +15,24 @@ import java.net.URL
 import java.net.URLClassLoader
 import java.nio.file.FileSystems
 import java.nio.file.Path
-import kotlin.io.path.absolute
-import kotlin.io.path.inputStream
+import kotlin.io.path.*
 import kotlin.time.Duration.Companion.milliseconds
 
-@Stable
+@Immutable
 data class AnimationData(
     val name: String,
     val symbol: AnimationSymbol,
     val factory: () -> Animation?,
 ) : () -> Animation? by factory
+
+@Immutable
+data class CurrentAnimationState(
+    val animation: Animation,
+    val data: AnimationData,
+    val animationLength: Int,
+    val markers: Map<String, Marker>,
+    val paused: Boolean,
+)
 
 class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: Path?) {
     private var loader: URLClassLoader? = null
@@ -40,41 +44,58 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
             field = value
         }
 
-    fun ready() {
-        scope.launch {
-            var lastTick: Long? = null
-            while (true) {
-                withFrameMillis { tick ->
-                    if (lastTick == null) {
-                        lastTick = tick
-                    }
-                    val framerate = activeAnimationData.value?.symbol?.data?.framerate ?: return@withFrameMillis
-                    if (tick - lastTick!! > 1000 / framerate) {
-                        lastTick = tick
-                        tickFrame()
-                    }
-                }
-            }
-        }
-        scope.launch {
-            animations.collect { animations ->
-                val currentAnimationData = _activeAnimationData.value
-                if (animations is Outcome.Success && currentAnimationData != null) {
-                    val x = animations.data
-                    setActiveAnimation(x.find { it.name == currentAnimationData.name })
-                }
-            }
+    val json = Json {
+        prettyPrint = true
+        isLenient = true
+    }
+
+    val defaultAnimations = listOf(
+        AnimationData("Test", AnimationSymbol("", "Test", "", AnimationSymbol.Data()), ::testAnimation)
+    )
+
+    val guiMarkerStorage = GuiMarkerStorage()
+
+    private val activeAnimationData = MutableStateFlow<AnimationData?>(null)
+    private val activeAnimation = MutableStateFlow<Animation?>(null)
+    private val animationLength = MutableStateFlow(0)
+    private val pausedFlow = MutableStateFlow(false)
+
+    val animationState = combine(
+        activeAnimationData,
+        activeAnimation,
+        animationLength,
+        guiMarkerStorage.markers,
+        pausedFlow,
+    ) { animationData, animation, length, markers, paused ->
+        if (animationData == null || animation == null) {
+            null
+        } else {
+            CurrentAnimationState(
+                animation,
+                animationData,
+                length,
+                markers,
+                paused,
+            )
         }
     }
 
+    val animationMetadata = if (metadataPath != null) {
+        flow {
+            emit(json.decodeFromStream<AnimationMetadata>(metadataPath.inputStream()) to true)
+            flow {
+                watchFile(FileSystems.getDefault().newWatchService(), metadataPath)
+            }.collect {
+                emit(json.decodeFromStream<AnimationMetadata>(it.inputStream()) to false)
+            }
+        }.flowOn(Dispatchers.IO)
+    } else {
+        emptyFlow()
+    }.stateIn(scope, SharingStarted.Eagerly, null)
+
     @OptIn(FlowPreview::class)
     val animations = if (metadataPath != null) {
-        flow {
-            emit(metadataPath to true)
-            flow { watchFile(FileSystems.getDefault().newWatchService(), metadataPath) }.collect { emit(it to false) }
-        }.flowOn(Dispatchers.IO).map { (it, force) ->
-            Json.decodeFromStream<AnimationMetadata>(it.inputStream()) to force
-        }.transformLatest { (metadata, force) ->
+        animationMetadata.filterNotNull().transformLatest { (metadata, force) ->
             if (force) {
                 emit(Outcome.Success(metadata))
             } else {
@@ -97,62 +118,107 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
             }
         }.flowOn(Dispatchers.IO)
     } else {
-        flowOf(
-            Outcome.Success(
-                listOf(
-                    AnimationData(
-                        "Test", AnimationSymbol("", "Test", "", AnimationSymbol.Data())
-                    ) { testAnimation() })
-            )
-        )
+        flowOf(Outcome.Success(defaultAnimations))
     }
 
-    private var _activeAnimationData = MutableStateFlow<AnimationData?>(null)
-    val activeAnimationData: StateFlow<AnimationData?> = _activeAnimationData
-
-    private val _activeAnimation = MutableStateFlow<Animation?>(null)
-    val activeAnimation: StateFlow<Animation?> = _activeAnimation
+    fun ready() {
+        scope.launch {
+            var lastTick: Long? = null
+            while (true) {
+                withFrameMillis { tick ->
+                    if (lastTick == null) {
+                        lastTick = tick
+                    }
+                    val framerate = (activeAnimationData.value ?: return@withFrameMillis).symbol.data.framerate
+                    if (tick - lastTick!! > 1000 / framerate) {
+                        lastTick = tick
+                        tickFrame()
+                    }
+                }
+            }
+        }
+        scope.launch {
+            animations.collect { animations ->
+                val currentAnimationData = activeAnimationData.value
+                if (animations is Outcome.Success && currentAnimationData != null) {
+                    val x = animations.data
+                    setActiveAnimation(x.find { it.name == currentAnimationData.name })
+                }
+            }
+        }
+        scope.launch {
+            combine(guiMarkerStorage.markers, animationMetadata.filterNotNull(), activeAnimationData) { a, (b), c ->
+                Triple(a, b, c)
+            }.flowOn(Dispatchers.IO).collect { (markers, meta, data) ->
+                if (data != null) {
+                    val markers = mapOf(
+                        data.symbol.simpleString() to markers.mapValues { (_, value) -> value.position },
+                    )
+                    val markerStoragePath = Path.of(meta.resourceDir).resolve("markers.json")
+                    markerStoragePath.createParentDirectories()
+                    val data = if (markerStoragePath.exists()) {
+                        runCatching { json.decodeFromString<Map<String, Map<String, Frames>>>(markerStoragePath.readText()) }.getOrElse { emptyMap() }
+                    } else {
+                        emptyMap()
+                    } + markers
+                    markerStoragePath.writeText(json.encodeToString(data))
+                }
+            }
+        }
+    }
 
     fun setActiveAnimation(animation: AnimationData?) {
-        _activeAnimationData.value = animation
-        if (animation == null) {
-            _activeAnimation.value = null
-            calculateAnimationStats(null)
-        } else {
-            calculateAnimationStats(animation)
-            val freshAnimation = animation()
-            _activeAnimation.value = freshAnimation
+        activeAnimationData.value = animation
+        val loadedMarkers = animation?.loadMarkers() ?: emptyMap()
+        val markers = mutableMapOf<String, Marker>()
+        val tempMarkerStorage = object : MarkerStorage {
+            override fun get(name: String) = markers.getOrPut(name) { Marker(loadedMarkers[name]?.position ?: 0, name) }
+        }
+        Markers.storage = tempMarkerStorage
+        calculateAnimationStats(animation)
+        guiMarkerStorage.setMarkers(markers)
+        Markers.storage = guiMarkerStorage
+        activeAnimation.value = animation?.invoke()
+        if (animation != null) {
             setCursorFrame(cursorFrame.value, force = true)
         }
     }
 
-    fun calculateAnimationStats(animation: AnimationData?) {
-        Markers.storage = guiMarkerStorage
-        guiMarkerStorage.clearMarkers()
+    private fun AnimationData.loadMarkers(): Map<String, Marker> {
+        val meta = animationMetadata.value ?: return emptyMap()
+        val markerStoragePath = Path.of(meta.first.resourceDir).resolve("markers.json")
+        return try {
+            Json.decodeFromString<Map<String, Map<String, Frames>>>(markerStoragePath.readText())[symbol.simpleString()]!!
+        } catch (_: Exception) {
+            return emptyMap()
+        }.mapValues { (key, value) -> Marker(value, key) }
+    }
+
+    fun calculateAnimationStats(animation: AnimationData? = activeAnimationData.value) {
         val freshAnimation = animation?.factory() ?: return
+        var _animationLength = 0
         while (!freshAnimation.isFinished) {
             freshAnimation.tick()
+            _animationLength++
         }
+        animationLength.value = _animationLength
     }
 
     fun restartAnimation(): Animation? {
-        val freshAnimation = (_activeAnimationData.value ?: return null)()
-        _activeAnimation.value = freshAnimation
+        val freshAnimation = (activeAnimationData.value ?: return null)()
+        activeAnimation.value = freshAnimation
         return freshAnimation
     }
 
-    private val _paused = MutableStateFlow(false)
-    val paused: StateFlow<Boolean> = _paused
-
     fun setPaused(paused: Boolean) {
-        _paused.value = paused
+        pausedFlow.value = paused
     }
 
     private val _cursorFrame = MutableStateFlow(1)
     val cursorFrame: StateFlow<Int> = _cursorFrame
 
     fun setCursorFrame(cursor: Int, force: Boolean = false) {
-        val cursor = cursor.coerceAtLeast(1)
+        val cursor = cursor.coerceIn(1..animationLength.value)
         if (cursor == _cursorFrame.value && !force) return
         seekAnimationTo(cursor)
         _cursorFrame.value = cursor
@@ -168,7 +234,7 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
                 animation.tick()
             }
         } else {
-            val activeAnimation = _activeAnimation.value ?: return
+            val activeAnimation = activeAnimation.value ?: return
             for (i in 1..cursor - activeAnimation.ticks) {
                 if (activeAnimation.isFinished) {
                     break
@@ -184,7 +250,7 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
     }
 
     fun tickFrame() {
-        if (paused.value) return
+        if (pausedFlow.value) return
         val activeAnimation = activeAnimation.value ?: return
         if (!activeAnimation.isFinished) {
             seekBy(1)
@@ -231,18 +297,29 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
         }
     }
 
-    fun modifyMarker(name: String, newValue: Marker) {
-        guiMarkerStorage.markers += name to newValue
+    fun setMarker(name: String, newValue: Marker) {
+        println("$name = $newValue")
+        guiMarkerStorage.addMarker(name, newValue)
+        calculateAnimationStats()
         seekBy(0)
     }
 
-    val guiMarkerStorage = GuiMarkerStorage()
+    class GuiMarkerStorage internal constructor() : MarkerStorage {
+        val markers: StateFlow<Map<String, Marker>>
+            field = MutableStateFlow(emptyMap())
 
-    class GuiMarkerStorage : MarkerStorage {
-        var markers by mutableStateOf(emptyMap<String, Marker>())
-        override fun get(name: String) = markers[name] ?: Marker(0, name).also { markers += name to it }
+        override fun get(name: String) = markers.value[name] ?: Marker(0, name).also { addMarker(name, it) }
+
+        fun setMarkers(markers: Map<String, Marker>) {
+            this.markers.value = markers
+        }
+
+        fun addMarker(name: String, newValue: Marker) {
+            markers.value += name to newValue
+        }
+
         fun clearMarkers() {
-            markers = emptyMap()
+            markers.value = emptyMap()
         }
     }
 }

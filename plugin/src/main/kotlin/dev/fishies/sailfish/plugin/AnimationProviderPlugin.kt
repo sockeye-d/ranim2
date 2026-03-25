@@ -30,10 +30,12 @@ private fun Project.applyAnimationProviderPlugin() {
 
     val jsonFile = projectDir.resolve("metadata.json")
     val jarFilePath = tasks.withType<Jar>().first().outputs.files.singleFile
+    val resourceDir = projectDir.resolve("src/main/resources")
 
     extensions.configure<KspExtension> {
         arg("jsonFile", jsonFile.absolutePath)
         arg("jarFile", jarFilePath.absolutePath)
+        arg("resourceDir", resourceDir.absolutePath)
     }
 
     extensions.configure<KotlinJvmExtension> {
@@ -54,6 +56,10 @@ private fun Project.applyAnimationProviderPlugin() {
 
     tasks.withType<KspAATask>().all {
         outputs.file(jsonFile)
+    }
+
+    tasks.withType<Jar>() {
+        exclude("**/markers.json")
     }
 
     val watchSources = tasks.register("watchSources") {

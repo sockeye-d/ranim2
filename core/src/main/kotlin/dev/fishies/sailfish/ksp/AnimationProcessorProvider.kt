@@ -14,6 +14,7 @@ import java.io.File
 @Immutable
 @Serializable
 data class AnimationMetadata(
+    val resourceDir: String,
     val jarFileOutputPath: String,
     val animations: List<AnimationSymbol>,
 )
@@ -27,6 +28,7 @@ data class AnimationSymbol(
     val data: Data,
 ) {
     override fun toString() = "$ownerClassName.$fnName($signature)"
+    fun simpleString() = "$ownerClassName.$fnName"
 
     @Serializable
     data class Data(
@@ -61,6 +63,7 @@ class AnimationProviderProcessor(private val environment: SymbolProcessorEnviron
         jsonFile.writeText(
             json.encodeToString(
                 AnimationMetadata(
+                    resourceDir = environment.options["resourceDir"] ?: error("Resource directory required"),
                     jarFileOutputPath = environment.options["jarFile"] ?: error("JAR filepath required"),
                     animations = animations.toList(),
                 )

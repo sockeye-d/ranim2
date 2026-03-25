@@ -11,12 +11,12 @@ import androidx.compose.material.icons.rounded.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import dev.fishies.sailfish.Animation
 import dev.fishies.sailfish.Marker
 import dev.fishies.sailfish.theming.LocalTheme
 import kotlinx.coroutines.launch
@@ -25,17 +25,15 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainScreen(
     animations: Outcome<List<AnimationData>>,
-    paused: Boolean,
+    state: CurrentAnimationState?,
+    cursorFrame: Int,
+    setCursorFrame: (Int) -> Unit,
     setPaused: (Boolean) -> Unit,
-    activeAnimation: Animation?,
     setActiveAnimation: (AnimationData) -> Unit = {},
-    activeAnimationData: AnimationData?,
-    cursorFrameState: MutableState<Int>,
-    markers: Map<String, Marker>,
     modifyMarker: (String, Marker) -> Unit,
 ) {
     var layerSize by remember { mutableStateOf(IntSize.Zero) }
-    val graphicsLayer = rememberGraphicsLayer().configureAnimation(activeAnimation, layerSize)
+    val graphicsLayer = rememberGraphicsLayer().configureAnimation(state?.animation, layerSize)
 
     Box(Modifier.background(MaterialTheme.colors.background).fillMaxSize().onSizeChanged { layerSize = it }) {
         CompositionLocalProvider(LocalContentColor provides MaterialTheme.colors.onBackground) {
@@ -44,7 +42,8 @@ fun MainScreen(
                 Surface(Modifier.fillMaxWidth()) {
                     Column {
                         PlayControlBar(
-                            paused,
+                            state != null,
+                            state?.paused ?: false,
                             setPaused,
                             {},
                             {},
@@ -52,29 +51,49 @@ fun MainScreen(
                             setActiveAnimation = setActiveAnimation,
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                             left = {
-                                if (activeAnimationData != null) {
-                                    Text("${activeAnimationData.symbol.data.framerate}")
+                                if (state?.data != null) {
+                                    Text("${state.data.symbol.data.framerate}")
                                 }
                             },
                             right = {
                                 AnimationPicker(
-                                    animations,
-                                    setActiveAnimation = setActiveAnimation,
-                                    modifier = Modifier
+                                    animations, setActiveAnimation = setActiveAnimation, modifier = Modifier
                                 )
-                            }
-                        )
+                            })
 
+                        val animationEnd by rememberUpdatedState(state?.animationLength)
+                        val animationEndSmoothed by animateFloatAsState(animationEnd?.toFloat() ?: 0.0f, timelineElementAnimation)
+                        val secondary = MaterialTheme.colors.secondary
                         ScrubBar(
-                            remember {
-                                ScrubBarState(
-                                    cursorFrameState = cursorFrameState,
-                                )
-                            },
-                            markers,
-                            modifyMarker,
+                            remember { ScrubBarState() },
+                            cursorFrame,
+                            setCursorFrame,
                             Modifier.height(128.dp).fillMaxWidth().padding(bottom = 8.dp),
-                        )
+                            drawContent = { getPosition, _ ->
+                                animationEnd?.let { _ ->
+                                    val startPos = getPosition(0.0f)
+                                    val endPos = getPosition(animationEndSmoothed)
+                                    drawRoundRect(secondary, Offset(startPos, 0.0f), Size(endPos - startPos, 20f), alpha = 0.2f, cornerRadius = CornerRadius(4f, 4f))
+                                    // drawRoundRect(secondary, Offset(startPos, 0.0f), Size(endPos - startPos, 10f), style = Stroke(2f), cornerRadius = CornerRadius(4f, 4f))
+                                }
+                            }
+                        ) { getPosition, getFrame ->
+                            for ((name, marker) in state?.markers ?: emptyMap()) {
+                                val name by rememberUpdatedState(name)
+                                val marker by rememberUpdatedState(marker)
+                                TimelineHandle(
+                                    getPosition,
+                                    getFrame,
+                                    marker.position,
+                                    { modifyMarker(name, marker.copy(position = it)) },
+                                    Modifier.align(Alignment.BottomStart)
+                                ) {
+                                    Row {
+                                        Text(name)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -85,6 +104,7 @@ fun MainScreen(
 
 @Composable
 private fun PlayControlBar(
+    enabled: Boolean,
     paused: Boolean,
     setPaused: (Boolean) -> Unit,
     skipBackwards: () -> Unit,
@@ -96,27 +116,29 @@ private fun PlayControlBar(
     right: @Composable RowScope.() -> Unit = {},
 ) {
     Row(modifier) {
-        Row(Modifier.weight(1f).padding(start = 8.dp).align(Alignment.CenterVertically), Arrangement.Start, Alignment.CenterVertically) {
+        Row(
+            Modifier.weight(1f).padding(start = 8.dp).align(Alignment.CenterVertically),
+            Arrangement.Start,
+            Alignment.CenterVertically
+        ) {
             left()
         }
         Row {
-            IconButton(skipBackwards) {
-                Icon(
-                    Icons.Rounded.SkipPrevious, null
-                )
+            IconButton(skipBackwards, enabled = enabled) {
+                Icon(Icons.Rounded.SkipPrevious, null)
             }
-            IconToggleButton(paused, { setPaused(!paused) }) {
-                Icon(
-                    if (paused) Icons.Rounded.PlayCircle else Icons.Rounded.PauseCircle, null, Modifier.size(32.dp)
-                )
+            IconToggleButton(paused, { setPaused(!paused) }, enabled = enabled) {
+                Icon(if (paused) Icons.Rounded.PlayCircle else Icons.Rounded.PauseCircle, null, Modifier.size(32.dp))
             }
-            IconButton(skipForwards) {
-                Icon(
-                    Icons.Rounded.SkipNext, null
-                )
+            IconButton(skipForwards, enabled = enabled) {
+                Icon(Icons.Rounded.SkipNext, null)
             }
         }
-        Row(Modifier.weight(1f).padding(end = 8.dp).align(Alignment.CenterVertically), Arrangement.End, Alignment.CenterVertically) {
+        Row(
+            Modifier.weight(1f).padding(end = 8.dp).align(Alignment.CenterVertically),
+            Arrangement.End,
+            Alignment.CenterVertically
+        ) {
             right()
         }
     }

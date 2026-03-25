@@ -1,39 +1,41 @@
 package dev.fishies.sailfish.gui
 
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.PointerMatcher
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.*
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.text.*
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import dev.fishies.sailfish.Marker
 import dev.fishies.sailfish.gui.util.onDragAbsolute
 import dev.fishies.sailfish.util.exp10
 import kotlin.math.*
 
 @Stable
-class ScrubBarState(cursorFrameState: MutableState<Int>) {
+class ScrubBarState {
     var scroll by mutableFloatStateOf(0f)
     var zoom by mutableFloatStateOf(1f)
-    var cursorFrame by cursorFrameState
 
     val speed = 2.0f
 }
 
-private val tickShape = RoundedCornerShape(2.0.dp)
+val timelineElementAnimation: AnimationSpec<Float> = spring(stiffness = Spring.StiffnessHigh)
+val tickShape = RoundedCornerShape(2.0.dp)
 private val knobShape = GenericShape { (width, height), _ ->
     lineTo(width, 0.0f)
     lineTo(width * 0.5f, height)
@@ -43,13 +45,15 @@ private val knobShape = GenericShape { (width, height), _ ->
 val timelineHandleShape =
     RoundedCornerShape(topStartPercent = 0, bottomStartPercent = 50, topEndPercent = 50, bottomEndPercent = 50)
 
-@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class, ExperimentalMaterialApi::class)
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ScrubBar(
     state: ScrubBarState,
-    markers: Map<String, Marker>,
-    modifyMarker: (String, Marker) -> Unit,
+    cursorFrame: Int,
+    setCursorFrame: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    drawContent: DrawScope.(getPosition: (frame: Float) -> Float, getFrame: (position: Float) -> Float) -> Unit = { _, _ -> },
+    content: @Composable BoxScope.(getPosition: (frame: Float) -> Float, getFrame: (position: Float) -> Float) -> Unit = { _, _ -> },
 ) {
     val contentColor = LocalContentColor.current
     val tickColor = lerp(LocalContentColor.current, MaterialTheme.colors.surface, 0.5f)
@@ -62,7 +66,7 @@ fun ScrubBar(
     val localFontSize = LocalTextStyle.current.fontSize
 
     fun updateCursorFrame() {
-        state.cursorFrame = ((mouseX + state.scroll) / 50f / state.zoom).roundToInt()
+        setCursorFrame(((mouseX + state.scroll) / 50f / state.zoom).roundToInt())
     }
 
     val modifier = modifier.scrollable(rememberScrollableState {
@@ -124,7 +128,7 @@ fun ScrubBar(
                     result, color, Offset(x - result.multiParagraph.width * 0.5f, 20.0f - result.multiParagraph.height)
                 )
             }
-            val cursorX = state.cursorFrame * 50f * zoom - scroll
+            val cursorX = cursorFrame * 50f * zoom - scroll
             withTransform({ translate(left = cursorX - 1.0f, top = textSize) }) {
                 drawOutline(
                     tickShape.createOutline(Size(2.0f, size.height - textSize), layoutDirection, Density(density)),
@@ -137,48 +141,39 @@ fun ScrubBar(
                     primaryColor
                 )
             }
+            withTransform({ translate(top = textSize) }) {
+                drawContent({ it * 50f * zoom - scroll }, { (it + scroll) / 50f / zoom })
+            }
         }
 
         val smoothScroll by derivedStateOf { smoothed.x }
         val smoothZoom by derivedStateOf { smoothed.y }
 
-        for ((name, marker) in markers) {
-            TimelineHandle(
-                smoothScroll,
-                smoothZoom,
-                marker.position,
-                { modifyMarker(name, marker.copy(position = it)) },
-                Modifier.align(Alignment.BottomStart)
-            ) {
-                Row {
-                    Text(name)
-                }
-            }
-        }
+        content({ it * 50f * smoothZoom - smoothScroll }, { (it + smoothScroll) / 50f / smoothZoom })
     }
 }
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun TimelineHandle(
-    scroll: Float,
-    zoom: Float,
+    getPosition: (frame: Float) -> Float,
+    getFrame: (position: Float) -> Float,
     frame: Int,
     setFrame: (Int) -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val scroll by rememberUpdatedState(scroll)
-    val zoom by rememberUpdatedState(zoom)
+    val getPosition by rememberUpdatedState(getPosition)
+    val getFrame by rememberUpdatedState(getFrame)
     val frame by rememberUpdatedState(frame)
-    val animatedFrame by animateFloatAsState(frame.toFloat(), spring(stiffness = Spring.StiffnessHigh))
-    val x by derivedStateOf { animatedFrame * 50f * zoom - scroll - 1f }
+    val animatedFrame by animateFloatAsState(frame.toFloat(), timelineElementAnimation)
+    val x by derivedStateOf { getPosition(animatedFrame) - 1f }
     val modifier = modifier.absoluteOffset(x = x.dp).onDragAbsolute(
         PointerMatcher.Primary,
-        initialOffset = { Offset(frame * 50f * zoom - scroll - 1f, 0f) },
+        initialOffset = { Offset(getPosition(animatedFrame) - 1f, 0f) },
     ) { (x, _) ->
-        setFrame(((x + scroll) / 50f / zoom).roundToInt())
-    }.shadow(2.dp)
+        setFrame(getFrame(x).roundToInt())
+    }.shadow(8.dp, timelineHandleShape)
     Surface(
         shape = timelineHandleShape,
         color = MaterialTheme.colors.primary,
