@@ -47,8 +47,6 @@ fun MainScreen(
                             setPaused,
                             {},
                             {},
-                            animations,
-                            setActiveAnimation = setActiveAnimation,
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                             left = {
                                 if (state?.data != null) {
@@ -67,6 +65,7 @@ fun MainScreen(
                             timelineElementAnimation
                         )
                         val secondary = MaterialTheme.colors.secondary
+                        val cursorFrame by animateFloatAsState(cursorFrame.toFloat(), timelineElementAnimation)
                         ScrubBar(
                             remember { ScrubBarState() },
                             cursorFrame,
@@ -118,8 +117,6 @@ private fun PlayControlBar(
     setPaused: (Boolean) -> Unit,
     skipBackwards: () -> Unit,
     skipForwards: () -> Unit,
-    animations: Outcome<List<AnimationData>>,
-    setActiveAnimation: (AnimationData) -> Unit,
     modifier: Modifier = Modifier,
     left: @Composable RowScope.() -> Unit = {},
     right: @Composable RowScope.() -> Unit = {},

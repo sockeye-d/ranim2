@@ -70,11 +70,12 @@ fun colorPickerAnimation() = animation {
     val state = ColorPickerState()
 
     val picker = colorPicker(state)
-    picker.position = Offset(150f, 150f)
+    picker.position = Offset(250f, 150f)
 
     yield("event")
     yield("event2")
     yield("event3")
+    yield("event4")
 
     val colors = listOf(theme.primary, theme.secondary, theme.error)
 
@@ -85,8 +86,8 @@ fun colorPickerAnimation() = animation {
 
 @AnimationProvider
 fun showHi() = animation {
-    val hi = text("i am getting internal kotlinc errors they look scary", position = Offset(50f, 50f))
-    for (i in 1..1000) {
+    val hi = text("i am NO LONGER getting internal kotlinc errors they DON'T look scary", position = Offset(50f, 50f))
+    for (i in 1..10) {
         yield(hi::position.tween(to = Offset(100f, 50f), length = 30, tweener = cubic(InOut)))
         yield(hi::position.tween(to = Offset(50f, 50f), length = 30, tweener = cubic(InOut)))
     }

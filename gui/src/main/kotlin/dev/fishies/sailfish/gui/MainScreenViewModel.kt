@@ -5,13 +5,11 @@ import androidx.compose.runtime.withFrameMillis
 import dev.fishies.sailfish.*
 import dev.fishies.sailfish.elements.text
 import dev.fishies.sailfish.gui.util.watchDir
-import dev.fishies.sailfish.gui.util.watchFile
 import dev.fishies.sailfish.ksp.AnimationMetadata
 import dev.fishies.sailfish.ksp.AnimationSymbol
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.decodeFromStream
 import org.gradle.tooling.GradleConnector
 import java.net.URL
 import java.net.URLClassLoader
@@ -82,15 +80,31 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
     }
 
     val animationMetadata = if (metadataPath != null) {
+        val projectDir = metadataPath.parent
+        println("Initializing Gradle connection...")
+        val connection = GradleConnector.newConnector().forProjectDirectory(projectDir.toFile()).connect()
+        println("Gradle connection initialized!")
         flow {
-            emit(json.decodeFromStream<AnimationMetadata>(metadataPath.inputStream()) to true)
-            flow {
-                watchFile(metadataPath) {
+            emit(null)
+            watchDir(
+                path = projectDir.resolve("src/"),
+                projectDir.resolve("src/main/resources/markers.json")
+            ) { it, _ ->
+                if (!it.endsWith("~")) {
                     emit(it)
                 }
-            }.collect {
-                emit(json.decodeFromStream<AnimationMetadata>(it.inputStream()) to false)
             }
+        }.flowOn(Dispatchers.IO).debounce(100.milliseconds).transformLatest {
+            if (it != null) {
+                emit(Outcome.Progress)
+                println("Rebuilding due to $it")
+                runInterruptible {
+                    connection.newBuild().forTasks("jar").setStandardOutput(System.out).run()
+                }
+                println("Rebuilt!")
+            }
+            val newMetadata = json.decodeFromString<AnimationMetadata>(metadataPath.readText())
+            emit(Outcome.Success(newMetadata))
         }.flowOn(Dispatchers.IO)
     } else {
         emptyFlow()
@@ -98,25 +112,13 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
 
     @OptIn(FlowPreview::class)
     val animations = if (metadataPath != null) {
-        animationMetadata.filterNotNull().transformLatest { (metadata, force) ->
-            if (force) {
-                emit(Outcome.Success(metadata))
-            } else {
-                emit(Outcome.Progress)
-                flow {
-                    watchFile(Path.of(metadata.jarFileOutputPath)) {
-                        emit(it)
-                    }
-                }.flowOn(Dispatchers.IO).debounce(500.milliseconds).first()
-                emit(Outcome.Success(metadata))
-            }
-        }.transformLatest { metadata ->
+        animationMetadata.filterNotNull().transformLatest { metadata ->
             emit(Outcome.Progress)
             if (metadata is Outcome.Success) {
-                val jarUrl: URL = Path.of(metadata.data.jarFileOutputPath).absolute().toUri().toURL()
-                retry@ while (true) {
-                    loadJarFrom(arrayOf(jarUrl), metadata.data) { break@retry }
-                    delay(100.milliseconds)
+                val (data) = metadata
+                val jarUrl: URL = Path.of(data.jarFileOutputPath).absolute().toUri().toURL()
+                loadJarFrom(arrayOf(jarUrl), data) {
+                    emit(Outcome.Success(it))
                 }
             }
         }.flowOn(Dispatchers.IO)
@@ -127,8 +129,10 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
     fun ready() {
         if (metadataPath != null) {
             val projectDir = metadataPath.parent
-            val connection = GradleConnector.newConnector().forProjectDirectory(projectDir.toFile()).connect()
             scope.launch(Dispatchers.IO) {
+                println("Initializing Gradle connection...")
+                val connection = GradleConnector.newConnector().forProjectDirectory(projectDir.toFile()).connect()
+                println("Gradle connection initialized!")
                 flow {
                     watchDir(
                         path = projectDir.resolve("src/"),
@@ -138,12 +142,16 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
                             emit(it)
                         }
                     }
-                }.debounce(10.milliseconds).collectLatest {
+                }.flowOn(Dispatchers.IO).debounce(100.milliseconds).transformLatest {
+                    emit(Outcome.Progress)
                     println("Rebuilding due to $it")
                     runInterruptible {
-                        connection.newBuild().forTasks("jar").run()
+                        connection.newBuild().forTasks("jar").setStandardOutput(System.out).run()
                     }
-                }
+                    println("Rebuilt!")
+                    val newMetadata = json.decodeFromString<AnimationMetadata>(metadataPath.readText())
+                    emit(Outcome.Success(newMetadata))
+                }.flowOn(Dispatchers.IO)
             }
         }
         scope.launch {
@@ -171,14 +179,14 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
             }
         }
         scope.launch {
-            combine(guiMarkerStorage.markers, animationMetadata.filterNotNull(), activeAnimationData) { a, (b), c ->
+            combine(guiMarkerStorage.markers, animationMetadata.filterNotNull(), activeAnimationData) { a, b, c ->
                 Triple(a, b, c)
-            }.flowOn(Dispatchers.IO).collect { (markers, meta, data) ->
-                if (data != null) {
+            }.collect { (markers, meta, data) ->
+                if (data != null && meta is Outcome.Success) {
                     val markers = mapOf(
                         data.symbol.simpleString() to markers.mapValues { (_, value) -> value.position },
                     )
-                    val markerStoragePath = Path.of(meta.resourceDir).resolve("markers.json")
+                    val markerStoragePath = Path.of(meta.data.resourceDir).resolve("markers.json")
                     markerStoragePath.createParentDirectories()
                     val data = if (markerStoragePath.exists()) {
                         runCatching { json.decodeFromString<Map<String, Map<String, Frames>>>(markerStoragePath.readText()) }.getOrElse { emptyMap() }
@@ -209,8 +217,8 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
     }
 
     private fun AnimationData.loadMarkers(): Map<String, Marker> {
-        val meta = animationMetadata.value ?: return emptyMap()
-        val markerStoragePath = Path.of(meta.first.resourceDir).resolve("markers.json")
+        val meta = animationMetadata.value?.dataOrNull ?: return emptyMap()
+        val markerStoragePath = Path.of(meta.resourceDir).resolve("markers.json")
         return try {
             Json.decodeFromString<Map<String, Map<String, Frames>>>(markerStoragePath.readText())[symbol.simpleString()]!!
         } catch (_: Exception) {
@@ -220,7 +228,7 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
 
     fun calculateAnimationStats(animation: AnimationData? = activeAnimationData.value) {
         val freshAnimation = animation?.factory() ?: return
-        var _animationLength = 0
+        var _animationLength = -1
         while (!freshAnimation.isFinished) {
             freshAnimation.tick()
             _animationLength++
@@ -242,7 +250,7 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
     val cursorFrame: StateFlow<Int> = _cursorFrame
 
     fun setCursorFrame(cursor: Int, force: Boolean = false) {
-        val cursor = cursor.coerceIn(1..animationLength.value)
+        val cursor = cursor.coerceIn(1..(animationLength.value.coerceAtLeast(1)))
         if (cursor == _cursorFrame.value && !force) return
         seekAnimationTo(cursor)
         _cursorFrame.value = cursor
@@ -298,14 +306,14 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
         }
     }
 
-    private suspend inline fun FlowCollector<Outcome<List<AnimationData>>>.loadJarFrom(
-        url: Array<URL>, metadata: AnimationMetadata, onSuccess: () -> Nothing,
+    private inline fun loadJarFrom(
+        url: Array<URL>,
+        metadata: AnimationMetadata,
+        onSuccess: (List<AnimationData>) -> Unit,
     ) {
         loader = URLClassLoader.newInstance(url).also { loader ->
             try {
-                val animations = metadata.animations.map { makeAnimationData(it, loader) }
-                emit(Outcome.Success(animations))
-                onSuccess()
+                onSuccess(metadata.animations.map { makeAnimationData(it, loader) })
             } catch (e: ReflectiveOperationException) {
                 println("Retrying due to $e")
             }
@@ -322,7 +330,6 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
     }
 
     fun setMarker(name: String, newValue: Marker) {
-        println("$name = $newValue")
         guiMarkerStorage.addMarker(name, newValue)
         calculateAnimationStats()
         seekBy(0)

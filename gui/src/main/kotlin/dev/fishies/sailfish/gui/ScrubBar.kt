@@ -49,7 +49,7 @@ val timelineHandleShape =
 @Composable
 fun ScrubBar(
     state: ScrubBarState,
-    cursorFrame: Int,
+    cursorFrame: Float,
     setCursorFrame: (Int) -> Unit,
     modifier: Modifier = Modifier,
     drawContent: DrawScope.(getPosition: (frame: Float) -> Float, getFrame: (position: Float) -> Float) -> Unit = { _, _ -> },
