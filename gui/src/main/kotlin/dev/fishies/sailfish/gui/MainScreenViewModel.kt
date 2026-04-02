@@ -296,9 +296,7 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
         seekAnimationTo(1)
     }
 
-    private fun makeAnimationData(
-        symbol: AnimationSymbol, loader: URLClassLoader
-    ): AnimationData {
+    private fun makeAnimationData(symbol: AnimationSymbol, loader: URLClassLoader): AnimationData {
         val clazz = loader.loadClass(symbol.ownerClassName)!!
         return AnimationData(symbol.fnName, symbol) {
             try {
