@@ -1,8 +1,7 @@
 package dev.fishies.sailfish.gui
 
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.PointerMatcher
+import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.GenericShape
@@ -12,6 +11,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawOutline
@@ -109,6 +110,7 @@ fun ScrubBar(
         getFrameF = { (it + scroll) / 50f / zoom }
     }
 
+    val focusRequester = remember { FocusRequester() }
     val modifier = modifier.scrollable(rememberScrollableState {
         state.scroll = (state.scroll + it * state.speed).coerceAtLeast(-100f)
         it
@@ -118,7 +120,7 @@ fun ScrubBar(
         state.scroll = (-mouseX + (mouseX + state.scroll) * zoomChange).coerceAtLeast(-100f)
     }).onSizeChanged {
         scope.size = it
-    }
+    }.focusable().focusRequester(focusRequester)
 
     LaunchedEffect(state) {
         var lastFrameMillis: Long? = null
@@ -147,6 +149,7 @@ fun ScrubBar(
                     }
                     if (e.button == PointerButton.Primary && e.type == PointerEventType.Press) {
                         pressed = true
+                        focusRequester.requestFocus()
                         updateCursorFrame()
                     }
                     if (e.button == PointerButton.Primary && e.type == PointerEventType.Release) {

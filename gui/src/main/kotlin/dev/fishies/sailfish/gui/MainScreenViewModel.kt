@@ -4,7 +4,8 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.withFrameMillis
 import dev.fishies.sailfish.*
 import dev.fishies.sailfish.elements.text
-import dev.fishies.sailfish.gui.util.*
+import dev.fishies.sailfish.gui.util.component6
+import dev.fishies.sailfish.gui.util.watchDir
 import dev.fishies.sailfish.ksp.AnimationMetadata
 import dev.fishies.sailfish.ksp.AnimationSymbol
 import kotlinx.coroutines.*
@@ -15,6 +16,7 @@ import org.gradle.tooling.GradleConnector
 import java.net.URL
 import java.net.URLClassLoader
 import java.nio.file.Path
+import java.util.zip.ZipException
 import kotlin.io.path.*
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -32,6 +34,7 @@ data class CurrentAnimationState(
     val animationLength: Int,
     val markers: Map<String, Marker>,
     val paused: Boolean,
+    val loop: Boolean,
 )
 
 class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: Path?) {
@@ -52,7 +55,7 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
     private val activeAnimation = MutableStateFlow<Animation?>(null)
     private val animationLength = MutableStateFlow(0)
     private val pausedFlow = MutableStateFlow(false)
-    private var paused by pausedFlow
+    private val loopFlow = MutableStateFlow(false)
 
     val animationState = combine(
         activeAnimationData,
@@ -60,16 +63,19 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
         animationLength,
         guiMarkerStorage.markers,
         pausedFlow,
-    ) { animationData, animation, length, markers, paused ->
+        loopFlow,
+    ) { (animationData, animation, length, markers, paused, loop) ->
         if (animationData == null || animation == null) {
             null
         } else {
+            @Suppress("UNCHECKED_CAST")
             CurrentAnimationState(
-                animation,
-                animationData,
-                length,
-                markers,
-                paused,
+                animation as Animation,
+                animationData as AnimationData,
+                length as Int,
+                markers as Map<String, Marker>,
+                paused as Boolean,
+                loop as Boolean,
             )
         }
     }
@@ -215,9 +221,20 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
         return freshAnimation
     }
 
-    @JvmName("setPausedSetter")
     fun setPaused(paused: Boolean) {
-        this.paused = paused
+        pausedFlow.value = paused
+    }
+
+    fun togglePaused() {
+        pausedFlow.value = !pausedFlow.value
+    }
+
+    fun setLoop(loop: Boolean) {
+        loopFlow.value = loop
+    }
+
+    fun toggleLoop() {
+        loopFlow.value = !loopFlow.value
     }
 
     val cursorFrame: StateFlow<Int>
@@ -227,40 +244,47 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
         val cursor = cursor.coerceIn(1..animationLength.value.coerceAtLeast(1))
         if (cursor == cursorFrame.value && !force) return
         seekAnimationTo(cursor)
-        cursorFrame.value = cursor
-        paused = true
+        pausedFlow.value = true
     }
 
     private fun seekAnimationTo(cursor: Int) {
         if (cursor <= cursorFrame.value) {
             val animation = restartAnimation() ?: return
+            cursorFrame.value = 0
             for (i in 1..cursor) {
                 if (animation.isFinished) {
-                    break
+                    return
                 }
                 animation.tick()
+                cursorFrame.value++
             }
         } else {
-            val activeAnimation = activeAnimation.value ?: return
-            for (i in 1..cursor - activeAnimation.ticks) {
-                if (activeAnimation.isFinished) {
-                    break
+            val animation = activeAnimation.value ?: return
+            if (animation.isFinished) {
+                return
+            }
+            val tickAmount = cursor - animation.ticks
+            for (i in 0..<tickAmount) {
+                animation.tick()
+                if (animation.isFinished) {
+                    return
                 }
-                activeAnimation.tick()
+                cursorFrame.value++
             }
         }
     }
 
     fun seekBy(delta: Int) {
-        seekAnimationTo(cursorFrame.value + delta)
-        cursorFrame.value += delta
+        seekAnimationTo((cursorFrame.value + delta).coerceAtLeast(1))
     }
 
     fun tickFrame() {
-        if (paused) return
+        if (pausedFlow.value) return
         val activeAnimation = activeAnimation.value ?: return
         if (!activeAnimation.isFinished) {
             seekBy(1)
+        } else if (loopFlow.value) {
+            seekToStart()
         }
     }
 
@@ -284,7 +308,10 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
                 println("Animation $symbol was not of type Animation")
                 println("Stack trace: ${e.stackTraceToString()}")
                 null
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                if (e.cause is ZipException) {
+                    println("Top-level properties should be `lazy`")
+                }
                 println("An exception occurred when attempting to load animation $symbol: $e")
                 println("Stack trace: ${e.stackTraceToString()}")
                 null
@@ -312,8 +339,7 @@ class MainScreenViewModel(private val scope: CoroutineScope, val metadataPath: P
 
     private fun testAnimation() = animation {
         val t = text("0")
-        yield("start")
-        while (!isPast("end")) {
+        for (i in 1..10) {
             t.text = (t.text.toInt() + 1).toString()
             yield()
         }

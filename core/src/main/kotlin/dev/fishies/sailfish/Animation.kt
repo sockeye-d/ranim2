@@ -3,7 +3,7 @@ package dev.fishies.sailfish
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.*
 
-class Animation : dev.fishies.sailfish.CompositeElement(), dev.fishies.sailfish.Animated {
+class Animation : CompositeElement(), Animated {
     internal lateinit var continuation: Continuation<Unit>
     override var isFinished = false
     var ticks = 0
@@ -22,7 +22,7 @@ class Animation : dev.fishies.sailfish.CompositeElement(), dev.fishies.sailfish.
     override fun propertyList() = emptyMap<String, String>()
 }
 
-val dev.fishies.sailfish.Element.absoluteTicks: Int
+val Element.absoluteTicks: Int
     get() {
         var e = this
         while (true) {
@@ -34,7 +34,7 @@ val dev.fishies.sailfish.Element.absoluteTicks: Int
                 }
             }
         }
-        return (e as dev.fishies.sailfish.Animation).ticks
+        return (e as Animation).ticks
     }
 
 /**

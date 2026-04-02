@@ -10,13 +10,13 @@ import dev.fishies.sailfish.containers.*
 import dev.fishies.sailfish.containers.Anchor
 import dev.fishies.sailfish.elements.rectangle
 import dev.fishies.sailfish.elements.text
+import dev.fishies.sailfish.theming.Theme
 import dev.fishies.sailfish.theming.theme
 import dev.fishies.sailfish.tweener.*
+import dev.fishies.sailfish.util.loadJson
 import kotlin.reflect.KProperty1
 
-private val loader = object {}::class.java.classLoader
-
-// val catppuccinMocha = loadJson<Theme>("files/catppuccin-mocha.json")
+val catppuccinMocha = loadJson<Theme>("files/catppuccin-mocha.json")
 
 class ColorPickerState {
     var color by mutableStateOf(Color.Red)
@@ -66,16 +66,16 @@ private fun CompositeElement.colorPicker(state: ColorPickerState) = panel(radius
 
 @AnimationProvider
 fun colorPickerAnimation() = animation {
-    // theme = catppuccinMocha
+    theme = catppuccinMocha
     val state = ColorPickerState()
 
     val picker = colorPicker(state)
-    picker.position = Offset(250f, 150f)
+    picker.position = Offset(150f, 150f)
 
     yield("event")
-    yield("event2")
-    yield("event3")
-    yield("event4")
+    // yield("event2")
+    // yield("event3")
+    // yield("event4")
     // println("hi")
 
     val colors = listOf(theme.primary, theme.secondary, theme.error)
@@ -83,6 +83,8 @@ fun colorPickerAnimation() = animation {
     for (color in colors) {
         yield(state::color.tween(to = color, length = 25, tweener = quadratic(InOut), colorSpace = ColorSpaces.Oklab))
     }
+
+    yield(picker::position.tween(to = Offset(300f, 150f), length = 50, tweener = cubic(Out)))
 }
 
 @AnimationProvider
@@ -104,5 +106,11 @@ fun showHi2() = animation {
 @AnimationProvider
 fun showHi3() = animation {
     val hi = rectangle(Size(50f, 50f), position = Offset(50f, 50f), color = theme.onBackground)
+    yield(hi::position.tween(to = Offset(100f, 50f), length = 100, tweener = cubic(InOut)))
+}
+
+@AnimationProvider
+fun showHi4() = animation {
+    val hi = rectangle(Size(20f, 50f), position = Offset(50f, 50f), color = theme.onBackground)
     yield(hi::position.tween(to = Offset(100f, 50f), length = 100, tweener = cubic(InOut)))
 }

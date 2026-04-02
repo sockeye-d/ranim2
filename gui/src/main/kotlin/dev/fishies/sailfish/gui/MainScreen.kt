@@ -33,8 +33,12 @@ fun MainScreen(
     cursorFrame: Int,
     setCursorFrame: (Int) -> Unit,
     setPaused: (Boolean) -> Unit,
-    setActiveAnimation: (AnimationData) -> Unit = {},
+    setLoop: (Boolean) -> Unit,
+    setActiveAnimation: (AnimationData) -> Unit,
     modifyMarker: (String, Marker) -> Unit,
+    seekToStart: () -> Unit,
+    seekToEnd: () -> Unit,
+    seekBy: (Int) -> Unit,
 ) {
     var layerSize by remember { mutableStateOf(IntSize.Zero) }
     val graphicsLayer = rememberGraphicsLayer().configureAnimation(state?.animation, layerSize)
@@ -47,10 +51,13 @@ fun MainScreen(
                     Column {
                         PlayControlBar(
                             state != null,
+                            state?.loop ?: false,
+                            setLoop,
                             state?.paused ?: false,
                             setPaused,
-                            {},
-                            {},
+                            seekToStart,
+                            seekToEnd,
+                            seekBy,
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                             left = {
                                 if (state?.data != null) {
@@ -75,7 +82,7 @@ fun MainScreen(
                             setCursorFrame,
                             Modifier.height(128.dp).fillMaxWidth().padding(bottom = 8.dp),
                             drawContent = {
-                                animationEnd?.let { _ ->
+                                if (animationEnd != null) {
                                     val startPos = getPosition(0.0f)
                                     val endPos = getPosition(animationEndSmoothed - 1)
                                     drawRoundRect(
@@ -114,10 +121,13 @@ fun MainScreen(
 @Composable
 private fun PlayControlBar(
     enabled: Boolean,
+    loop: Boolean,
+    setLoop: (Boolean) -> Unit,
     paused: Boolean,
     setPaused: (Boolean) -> Unit,
-    skipBackwards: () -> Unit,
-    skipForwards: () -> Unit,
+    seekToStart: () -> Unit,
+    seekToEnd: () -> Unit,
+    seekBy: (Int) -> Unit,
     modifier: Modifier = Modifier,
     left: @Composable RowScope.() -> Unit = {},
     right: @Composable RowScope.() -> Unit = {},
@@ -133,7 +143,14 @@ private fun PlayControlBar(
         Row {
             CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
                 IconButton(
-                    skipBackwards,
+                    seekToStart,
+                    enabled = enabled,
+                    modifier = Modifier.align(Alignment.CenterVertically).size(32.dp).clip(CircleShape)
+                ) {
+                    Icon(Icons.Rounded.SkipPrevious, null)
+                }
+                IconButton(
+                    { seekBy(-1) },
                     enabled = enabled,
                     modifier = Modifier.align(Alignment.CenterVertically).size(32.dp).clip(CircleShape)
                 ) {
@@ -161,18 +178,26 @@ private fun PlayControlBar(
             }
             CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
                 IconButton(
-                    skipForwards,
+                    { seekBy(1) },
                     enabled = enabled,
                     modifier = Modifier.align(Alignment.CenterVertically).size(32.dp).clip(CircleShape)
                 ) {
                     Icon(Icons.Rounded.ChevronRight, null)
                 }
                 IconButton(
-                    skipForwards,
+                    seekToEnd,
                     enabled = enabled,
                     modifier = Modifier.align(Alignment.CenterVertically).size(32.dp).clip(CircleShape)
                 ) {
-                    Icon(Icons.Rounded.Repeat, null)
+                    Icon(Icons.Rounded.SkipNext, null)
+                }
+                IconToggleButton(
+                    loop,
+                    { setLoop(!loop) },
+                    enabled = enabled,
+                    modifier = Modifier.align(Alignment.CenterVertically).size(32.dp).clip(CircleShape)
+                ) {
+                    Icon(if (loop) Icons.Rounded.RepeatOn else Icons.Rounded.Repeat, null)
                 }
             }
         }
